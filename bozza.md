@@ -8,7 +8,8 @@ I **container** sono l'effettiva entità che esegueno i microservizi, essi risie
 Inoltre i container hanno bisogno di salvare i dati persistenti nei **volumi**, che possono essere di tre tipi:
 - Il *volume locale* può essere implementato da più container, ma sempre nello stesso nodo.
 - Il *volume globale* è localizzato in un server remoto come per esempio un NAS
-- Il *volume distribuito* è distribuito su più nodi così da poter essere implementato da container su diversi nodi, ovviamente necessita di forte sincronizzazione tra i nodi.
+- Il *volume distribuito* è distribuito su più nodi così da poter essere implementato da container su diversi nodi, ovviamente necessita di forte sincronizzazione tra i nodi.  
+
 Il developer ha il compito di creare **servizi** e **deployment**, dove i servizi sono un insieme di container replicati su più nodi e i deployment sono un insieme di servizi che rappresentano il rilascio di una nuova versione dell'applicativo.
 L'obiettivo è garantire una gestione efficiente e organizzata delle informazioni così da rendere la gestione dei microservizi e del loro versionamento il più semplice possibile.
 ## Analisi dei requisiti
