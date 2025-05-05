@@ -1,14 +1,14 @@
 # Progetto Basi di Dati: Sistema di Gestione Orchestrator
 ## Abstract
-Questo progetto ha lo scopo di realizzare una base di dati per un Orchestator come Docker Swarm o Kubernetes.
+Questo progetto ha lo scopo di realizzare una base di dati per un Orchestrator come Docker Swarm o Kubernetes.
 Un orchestrator è un software che permette di gestire e coordinare più container Docker in un cluster.
 In un orchestrator ci possono essere **utenti** con diversi privilegi, nel nostro caso ci sono due tipi di utenti: *admin* e *developer*.
 Il primo gestisce la parte infrastrutturale quali i **nodi** e i **volumi**, mentre il secondo coordina la creazione di **servizi** e **deployment**.
-I **container** sono l'effettiva entità che esegueno i microservizi, essi risiedono in un **nodo** che può essere qualsiasi macchina con installato Docker, come per esempio una macchina virtuale o un'istanza EC2 su AWS.
+I **container** sono l'effettiva entità che eseguono i microservizi, essi risiedono in un **nodo** che può essere qualsiasi macchina con installato Docker, come per esempio una macchina virtuale o un'istanza EC2 su AWS.
 Inoltre i container hanno bisogno di salvare i dati persistenti nei **volumi**, che possono essere di tre tipi:
-- Il *volume locale* può essere implementato da più container, ma sempre nello stesso nodo.
+- Il *volume locale* può essere montato su più container, ma sempre nello stesso nodo.
 - Il *volume globale* è localizzato in un server remoto come per esempio un NAS
-- Il *volume distribuito* è distribuito su più nodi così da poter essere implementato da container su diversi nodi, ovviamente necessita di forte sincronizzazione tra i nodi.  
+- Il *volume distribuito* è distribuito su più nodi così da poter essere montato su container con nodi diversi tra di loro, ovviamente necessita di forte sincronizzazione tra i nodi.  
 
 Il developer ha il compito di creare **servizi** e **deployment**, dove i servizi sono un insieme di container replicati su più nodi e i deployment sono un insieme di servizi che rappresentano il rilascio di una nuova versione dell'applicativo.
 L'obiettivo è garantire una gestione efficiente e organizzata delle informazioni così da rendere la gestione dei microservizi e del loro versionamento il più semplice possibile.
@@ -38,7 +38,7 @@ Contengono le seguenti informazioni:
     - *nome*: stringa che insieme al servizio padre identifica il container
     - *stato*: stato del container
 I container possono avere associati più volumi che però sono allocati su un nodo, il container ha associato solo volumi che sono presenti nel nodo in cui il container è in esecuzione.
-Inoltre i container possono accedere a path limitate e diverse del volume con permessi differenti, come per esempio lettura e scrittura.
+Inoltre i container possono accedere a path limitati e diverse del volume con permessi differenti, come per esempio lettura e scrittura.
 - **Volumi**: sono le entità che permettono di salvare dati persistenti dei container Docker.
 Contengono le seguenti informazioni:
     - *id*: stringa che identifica il volume
@@ -66,7 +66,7 @@ Il deployment ha associato più servizi e può essere creato solo da un develope
 Inoltre è possibile creare uno storico dei deployment, quindi quando si crea un nuovo deployment il precedente viene associato a quello nuovo come "padre".
 
 ## Progettazione concettuale
-![Progettazione concettuale](/assets/ER.drawio.png)
+![Progettazione concettuale](/assets/ER.jpg)
 Si vuole realizzare una base di dati per la gestione di un orchestrator che gestisce i container Docker in un cluster.
 Un cluster contiene diversi nodi, di cui si vogliono memorizzare indirizzo IP, nome del sistema operativo e stato ("Up", "Down" e "Drain"). Ogni nodo è identificato da un proprio hostname univoco.
 Su ogni nodo possono essere ospitati diversi container Docker, di cui è di interesse conoscere nome e stato.
@@ -81,7 +81,34 @@ $$
 ## Progettazione logica
 Questa sezione descrive la progettazione logica dato lo schema concettuale sviluppato nella sezione precedente, con lo scopo di analizzare le ridondanze ed eliminare le generalizzazioni.
 #### Tabella Entità-Relazioni
+###### Tabella delle entità
 | Entità | Descrizione | Attributi | Identificatore |
+|-----------|-----------|-----------|-----------|
+| Utente | Utente che gestisce l'orchestrator | *Username, Password, Ruolo* | *Username* |
+| Developer | Utente che gestisce i servizi e i deployment | |  |
+| Admin | Utente che gestisce i nodi e i volumi | |  |
+| Nodo | Macchina fisica o virtuale che esegue i container Docker | *Hostname, Indirizzo IP, OS, Stato* | *Hostname* |
+| Container | Entità che esegue i microservizi | *Nome, Stato* | *Nome, NomeServizio* |
+| Volume | Entità che permette di salvare dati persistenti | *ID, Dimensione, PathFisico* | *ID* |
+| VolumeLocale | Volume allocato in un nodo | | |
+| VolumeGlobale | Volume allocato in un server remoto | *IndirizzoIPServer* | |
+| VolumeDistribuito | Volume allocato su più nodi | | |
+| Servizio | Astrazione che rappresenta un insieme di container replicati su più nodi | *Nome, Immagine, NumeroRepliche* | *Nome* |
+| Deployment | Astrazione che rappresenta un insieme di servizi rilasciati in una nuova versione dell'applicativo | *ID, Ambiente, Esito, NumeroServizi* | *ID* |
+
+###### Tabella delle relazioni
+| Relazione | Descrizione | Componente | Attributi |
+|-----------|-----------|-----------|-----------|
+| Sviluppo | Sviluppo servizio da parte di un developer | Developer, Servizio | |
+| Associazione | Associazione tra più servizi e più deployment | Servizio, Deployment | |
+| Produzione | Produzione deployment da parte di un developer | Developer, Deployment | |
+| Creazione | Creazione nodo da parte di un admin | Admin, Nodo | |
+| Ospitazione | Ospitazione di più container in un nodo | Nodo, Container | |
+| Part-of | Container è parte di un servizio | Servizio, Container | |
+| Montaggio | Associazione tra più container e più volumi | Container, Volume | *PathMontaggio, Permessi* |
+| Allocazione distribuita | Allocazione volume distribuito su più nodi | VolumeDistribuito, Nodo | |
+| Allocazione locale | Allocazione volume locale in un nodo | VolumeLocale, Nodo | |
+| Versione precedente | Associazione deployment alla sua versione precedente | Deployment, Deployment | |
 #### Analisi delle ridondanze
 Nello schema concettuale sono presenti due ridondanze da analizzare:
 - **Numero Repliche**, in *Servizio*, rappresenta il numero di container replicati su più nodi, che può essere ottenuto contando i container con lo stesso servizio.
@@ -183,35 +210,35 @@ Inoltre consideriamo che vengono creati in media 3 deployment al giorno (dev, te
   L'analisi suggerisce che l'attributo **Numero servizi** è utile, in quanto il costo totale con ridondanze è circa 3 volte inferiore, tuttavia anche l'ipotesi di rimuoverlo sarebbe valida dato il numero di accessi è in termini assoluti molto basso.
   Noi scegliamo di mantenerlo per semplificare le query ed evitare il calcolo del numero di servizi associati ad un deployment.
 
-#### Eliminazione delle generalizzioni
-![Progettazione concettuale](/assets/ER_Refurbished.drawio.png)
+#### Eliminazione delle generalizzazioni
+![Progettazione concettuale](/assets/ER_Refurbished.jpg)
 #### Schema relazionale
 - **Utente**(<u>Username</u>, Password, Ruolo)
-- **Servizio**(<u>Nome</u>, Immagine, NumeroRepliche?, Developer)
+- **Servizio**(<u>Nome</u>, Immagine, NumeroRepliche, Developer)
   - Servizio.Developer $\to$ Utente.Username
-- **Deployment**(<u>ID</u>, Ambiente, Esito, NumeroServizi?, ID_Deployment_Precedente$^*$, ID_Developer)
+- **Deployment**(<u>ID</u>, Ambiente, Esito, NumeroServizi, ID_Deployment_Precedente$^*$, ID_Developer)
   - Deployment.ID_Developer $\to$ Utente.Username
   - Deployment.ID_Deployment_Precedente $\to$ Deployment.ID
 - **ServizioDeployment**(NomeServizio, ID_Deployment)
   - ServizioDeployment.ID_Deployment $\to$ Deployment.ID
   - ServizioDeployment.NomeServizio $\to$ Servizio.Nome
-- **Nodo**(<u>ID</u>, Hostname, IP, OS, Status, ID_Admin)
+- **Nodo**(<u>Hostname</u>, IP, OS, Status, ID_Admin)
   - Nodo.ID_Admin $\to$ Utente.Username
-- **Container**(<u>ID, NomeServizio</u>, Nome, Stato)
+- **Container**(<u>Nome, NomeServizio</u>, Stato)
   - Container.NomeServizio $\to$ Servizio.Nome
 - **VolumeLocale**(<u>ID</u>, Dimensione, PathFisico, ID_Nodo)
-  - VolumeLocale.ID_Nodo $\to$ Nodo.ID
+  - VolumeLocale.ID_Nodo $\to$ Nodo.Hostname
 - **VolumeGlobale**(<u>ID</u>, Dimensione, PathFisico, IndirizzoIPServer)
 - **VolumeDistribuito**(<u>ID</u>, Dimensione, PathFisico)
 - **VolumiLocaliContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer</u>, PathMontaggio, Permessi)
   - VolumiLocaliContainer.ID_Volume $\to$ VolumeLocale.ID
-  - VolumiLocaliContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(ID, NomeServizio)
+  - VolumiLocaliContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(Nome, NomeServizio)
 - **VolumiGlobaliContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer</u>, PathMontaggio, Permessi)
   - VolumiGlobaliContainer.ID_Volume $\to$ VolumeGlobale.ID
-  - VolumiGlobaliContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(ID, NomeServizio)
+  - VolumiGlobaliContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(Nome, NomeServizio)
 - **VolumiDistribuitiContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer</u>, PathMontaggio, Permessi)
   - VolumiDistribuitiContainer.ID_Volume $\to$ VolumeDistribuito.ID
-  - VolumiDistribuitiContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(ID, NomeServizio)
+  - VolumiDistribuitiContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(Nome, NomeServizio)
 - **AllocazioneDistribuita**(<u>ID_Volume, ID_Nodo</u>)
   - AllocazioneDistribuita.ID_Volume $\to$ VolumeDistribuito.ID
-  - AllocazioneDistribuita.ID_Nodo $\to$ Nodo.ID
+  - AllocazioneDistribuita.ID_Nodo $\to$ Nodo.Hostname
