@@ -80,7 +80,108 @@ $$
 \forall v \in V \backslash \{\text{volumi globali}\}, c \in C, n \in N: v \in Associato(c), n \in Allocazione(v) \Rightarrow n \in Ospitazione(c)
 $$
 ## Progettazione logica
+Questa sezione descrive la progettazione logica dato lo schema concettuale sviluppato nella sezione precedente, con lo scopo di analizzare le ridondanze ed eliminare le generalizzazioni.
 #### Analisi delle ridondanze
+Nello schema concettuale sono presenti due ridondanze da analizzare:
+- **Numero Repliche**, in *Servizio*, rappresenta il numero di container replicati su più nodi, che può essere ottenuto contando i container con lo stesso servizio.
+Questo attributo viene modificato ogni volta che si vuole aumentare/diminuire il numero di repliche o quando un container viene creato o eliminato.
+Lo scopo di un Orchestrator è tutelare i servizi con variazione dei requisiti molto rapida, perciò ipotizziamo uno Swarm Docker con 50 servizi attivi e 20 repliche per servizio di media, ovvero 1000 container attivi.
+Sempre ipotizzando una media di 10 modifiche per ogni servizio al giorno, l'attributo **Numero Repliche** viene modificato in media 500 volte al giorno e viene visualizzato in media 20 volte al giorno per ogni servizio, ovvero 1000 volte al giorno.
+  - **Operazione 1** (500 al giorno): crea o elimina nuovo container associato ad un servizio, così aumentando o diminuendo il numero di repliche
+  - **Operazione 2** (1000 al giorno): visualizza il numero di repliche di un servizio
+
+  I volumi della base di dati:
+  | Entità | Costrutto | Volume |
+  |:-----------:|:-----------:|:-----------:|
+  | Container  | E | 1000 |
+  | Servizio | E | 50  |
+
+  - **CON RIDONDANZA**
+    - Operazione 1:
+
+      | Entità | Costrutto | Accessi | Tipo | Numero Operazioni |
+      |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
+      | Container  | E | 1 | S | 500|
+      | Part-of  | R | 1 | S | 500|
+      | Servizio | E | 1  | L | 500|
+      | Servizio | E | 1  | S | 500|
+
+    - Operazione 2:
+
+      | Entità | Costrutto | Accessi | Tipo | Numero Operazioni |
+      |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
+      | Servizio | E | 1  | L | 1000|
+
+    Assumendo costo doppio per gli accessi in scrittura:
+    $$ \text{CostoTotale}_{ConRidondanza} = (500 \cdot 2) \cdot 3 + 500 + 1000 = 4500$$
+
+  - **SENZA RIDONDANZA**
+    - Operazione 1:
+      | Entità | Costrutto | Accessi | Tipo | Numero Operazioni |
+      |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
+      | Container  | E | 1 | S | 500|
+      | Part-of  | R | 1 | S | 500|
+
+    - Operazione 2:
+
+      | Entità | Costrutto | Accessi | Tipo | Numero Operazioni |
+      |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
+      | Servizio | E | 1  | L | 1000|
+      | Part-of | R | 20 | L | 1000|
+    Assumendo costo doppio per gli accessi in scrittura:
+    $$ \text{CostoTotale}_{SenzaRidondanza} = (500 \cdot 2) \cdot 2 + 1000 + 1000 \cdot 20 = 23000 $$
+
+  L'analisi suggerisce che l'attributo **Numero Repliche** è necessario, in quanto il costo totale con ridondanza è 5 volte inferiore rispetto al costo totale senza ridondanza.
+
+- **Numero Servizi**, in *Deplyment*, rappresenta il numero di servizi associati ad un deployment, che può essere ottenuto contando i servizi con lo stesso deployment.
+Questo attributo non viene mai modificato dato che si preferisce crearne uno di nuovo al posto di modificarne uno già esistente per favorire il versionamento dei deployment.
+Ciò accade perchè c'è una forte necessità di fare rollback in caso il deployment fallisca o abbia dei bug nell'ambiente in cui è stato fatto.
+Utilizziamo le stesse ipotesi dell'analisi precedente, ovvero 50 servizi attivi e 20 repliche per servizio di media.
+Inoltre consideriamo che vengono creati in media 3 deployment al giorno (dev, test e produzione) con 50 servizi per deployment, quindi in totale ipotizziamo 1000 deployment come volume.
+  - **Operazione 1** (3 al giorno): memorizza un nuovo deployment associato a più servizi
+  - **Operazione 2** (6 volte al giorno): visualizza il numero di servizi di un deployment prima di crearne uno nuovo e dopo averlo creato
+
+  Come già specificato, specifichiamo i volumi della base di dati:
+  | Entità | Costrutto | Volume |
+  |:-----------:|:-----------:|:-----------:|
+  | Deployment  | E | 1000 |
+  | Servizio | E | 50 |
+
+  - **CON RIDONDANZA**
+    - Operazione 1:
+
+      | Entità | Costrutto | Accessi | Tipo | Numero Operazioni |
+      |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
+      | Deployment  | E | 1 | S | 3 |
+      | Associazione  | R | 1 | S | 50 |
+
+    - Operazione 2:
+
+      | Entità | Costrutto | Accessi | Tipo | Numero Operazioni |
+      |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
+      | Deployment | E | 1  | L | 6 |
+
+    Assumendo costo doppio per gli accessi in scrittura:
+    $$ \text{CostoTotale}_{ConRidondanza} = (3 \cdot 2) + (50 \cdot 2) + 6 =  112 $$
+
+  - **SENZA RIDONDANZA**
+    - Operazione 1:
+      | Entità | Costrutto | Accessi | Tipo | Numero Operazioni |
+      |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
+      | Deployment  | E | 1 | S | 3 |
+      | Associazione  | R | 1 | S | 50 |
+    - Operazione 2:
+
+      | Entità | Costrutto | Accessi | Tipo | Numero Operazioni |
+      |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
+      | Deployment | E | 1 | L | 6 |
+      | Servizio | E | 50 | L | 6 |
+    Assumendo costo doppio per gli accessi in scrittura:
+    $$ \text{CostoTotale}_{SenzaRidondanza} = (3 \cdot 2) + (50 \cdot 2) + 6 + (50\cdot6) = 412 $$
+
+  L'analisi suggerisce che l'attributo **Numero servizi** è utile, in quanto il costo totale con ridondanze è circa 3 volte inferiore, tuttavia anche l'ipotesi di rimuoverlo sarebbe valida dato il numero di accessi è in termini assoluti molto basso.
+  Noi scegliamo di mantenerlo per semplificare le query ed evitare il calcolo del numero di servizi associati ad un deployment.
+
 #### Eliminazione delle generalizzioni
 ![Progettazione concettuale](/assets/ER_Refurbished.drawio.png)
 #### Schema relazionale
