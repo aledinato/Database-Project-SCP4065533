@@ -51,11 +51,10 @@ Necessita oltre al path fisico del volume, anche di un indirizzo IP del server N
 - **Volume distribuito**: è un volume che può essere allocato su più nodi e può essere condiviso da più container di nodi diversi che hanno una distribuzione del volume
 - **Servizi**: sono un astrazione che rappresenta un insieme di container replicati su più nodi.
 Contengono le seguenti informazioni:
-    - *nome*: titolo del servizio
-    - *versione*: versione del servizio, insieme al nome identifica univocamente il servizio
+    - *nome*: titolo del servizio che lo identifica
     - *immagine*: immagine Docker da cui verranno creati i container
     - *numero repliche*: numero che rappresenta il numero di repliche del servizio
-I servizi sono creati e gestiti da un developer, il quale può creare più servizi con lo stesso nome ma con versioni diverse.
+I servizi sono creati e gestiti da un developer, il quale può creare più servizi con diverso nome.
 I servizi hanno più container associati (le "repliche"), potenzialmente anche sullo stesso nodo.
 - **Deployment**: sono un astrazione che rappresenta un insieme di servizi che vengono rilasciati in una nuova versione dell'applicativo.
 Contengono le seguenti informazioni:
@@ -73,7 +72,7 @@ Un cluster contiene diversi nodi, di cui si vogliono memorizzare indirizzo IP, n
 Su ogni nodo possono essere ospitati diversi container Docker, di cui è di interesse conoscere nome e stato.
 Ciascun container opera su diversi volumi che utilizza come file system. Un volume può anche essere condiviso tra più container. Ciascun volume è visto da un container con un percorso distinto e ciascun container dispone di permessi specifici su ognuno dei suoi volumi (lettura, scrittura, esecuzione, ecc.).
 I volumi, anche se condivisi da più container, dispongono di un proprio percorso fisico ed è di interesse memorizzarne la dimensione e il tipo (Locale, globale e distribuito). Mente un volume locale può essere allocato ad un solo nodo, i volumi distribuiti possono essere allocati su più nodi.
-I container, anche su nodi diversi, sono raggruppati in servizi distinti. Per ogni servizio, identificato da nome e versione, è di interesse sapere il percorso dell'immagine e il numero di repliche. Il volume può anche non essere associato a nessun container, ma è comunque allocato in un nodo.
+I container, anche su nodi diversi, sono raggruppati in servizi distinti. Per ogni servizio, identificato da nome, è di interesse sapere il percorso dell'immagine e il numero di repliche. Il volume può anche non essere associato a nessun container, ma è comunque allocato in un nodo.
 Il diagramma ER non permette di rappresentare il seguente vincolo che si evince dall'analisi dei requisiti: un volume può essere associato a un container e allocato in un nodo solo se il nodo padre del container è lo stesso a cui è allocato il volume.
 Sia $V$ l'insieme dei Volumi, $C$ l'insieme dei Container e $N$ l'insieme dei Nodi, allora:
 $$
@@ -81,6 +80,8 @@ $$
 $$
 ## Progettazione logica
 Questa sezione descrive la progettazione logica dato lo schema concettuale sviluppato nella sezione precedente, con lo scopo di analizzare le ridondanze ed eliminare le generalizzazioni.
+#### Tabella Entità-Relazioni
+| Entità | Descrizione | Attributi | Identificatore |
 #### Analisi delle ridondanze
 Nello schema concettuale sono presenti due ridondanze da analizzare:
 - **Numero Repliche**, in *Servizio*, rappresenta il numero di container replicati su più nodi, che può essere ottenuto contando i container con lo stesso servizio.
@@ -186,31 +187,31 @@ Inoltre consideriamo che vengono creati in media 3 deployment al giorno (dev, te
 ![Progettazione concettuale](/assets/ER_Refurbished.drawio.png)
 #### Schema relazionale
 - **Utente**(<u>Username</u>, Password, Ruolo)
-- **Servizio**(<u>Nome, Versione</u>, Immagine, NumeroRepliche?, Developer)
+- **Servizio**(<u>Nome</u>, Immagine, NumeroRepliche?, Developer)
   - Servizio.Developer $\to$ Utente.Username
 - **Deployment**(<u>ID</u>, Ambiente, Esito, NumeroServizi?, ID_Deployment_Precedente$^*$, ID_Developer)
   - Deployment.ID_Developer $\to$ Utente.Username
   - Deployment.ID_Deployment_Precedente $\to$ Deployment.ID
-- **ServizioDeployment**(VersioneServizio, NomeServizio, ID_Deployment)
+- **ServizioDeployment**(NomeServizio, ID_Deployment)
   - ServizioDeployment.ID_Deployment $\to$ Deployment.ID
-  - ServizioDeployment.(NomeServizio, VersioneServizio) $\to$ Servizio.(Nome, Versione)
+  - ServizioDeployment.NomeServizio $\to$ Servizio.Nome
 - **Nodo**(<u>ID</u>, Hostname, IP, OS, Status, ID_Admin)
   - Nodo.ID_Admin $\to$ Utente.Username
-- **Container**(<u>ID, NomeServizio, VersioneServizio</u>, Nome, Stato)
-  - Container.(NomeServizio, VersioneServizio) $\to$ Servizio.(Nome, Versione)
+- **Container**(<u>ID, NomeServizio</u>, Nome, Stato)
+  - Container.NomeServizio $\to$ Servizio.Nome
 - **VolumeLocale**(<u>ID</u>, Dimensione, PathFisico, ID_Nodo)
   - VolumeLocale.ID_Nodo $\to$ Nodo.ID
 - **VolumeGlobale**(<u>ID</u>, Dimensione, PathFisico, IndirizzoIPServer)
 - **VolumeDistribuito**(<u>ID</u>, Dimensione, PathFisico)
-- **VolumiLocaliContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer, VersioneServizioContainer</u>, PathMontaggio, Permessi)
+- **VolumiLocaliContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer</u>, PathMontaggio, Permessi)
   - VolumiLocaliContainer.ID_Volume $\to$ VolumeLocale.ID
-  - VolumiLocaliContainer.(ID_Container, NomeServizioContainer, VersioneServizioContainer) $\to$ Container.(ID, NomeServizio, VersioneServizio)
-- **VolumiGlobaliContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer, VersioneServizioContainer</u>, PathMontaggio, Permessi)
+  - VolumiLocaliContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(ID, NomeServizio)
+- **VolumiGlobaliContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer</u>, PathMontaggio, Permessi)
   - VolumiGlobaliContainer.ID_Volume $\to$ VolumeGlobale.ID
-  - VolumiGlobaliContainer.(ID_Container, NomeServizioContainer, VersioneServizioContainer) $\to$ Container.(ID, NomeServizio, VersioneServizio)
-- **VolumiDistribuitiContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer, VersioneServizioContainer</u>, PathMontaggio, Permessi)
+  - VolumiGlobaliContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(ID, NomeServizio)
+- **VolumiDistribuitiContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer</u>, PathMontaggio, Permessi)
   - VolumiDistribuitiContainer.ID_Volume $\to$ VolumeDistribuito.ID
-  - VolumiDistribuitiContainer.(ID_Container, NomeServizioContainer, VersioneServizioContainer) $\to$ Container.(ID, NomeServizio, VersioneServizio)
+  - VolumiDistribuitiContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(ID, NomeServizio)
 - **AllocazioneDistribuita**(<u>ID_Volume, ID_Nodo</u>)
   - AllocazioneDistribuita.ID_Volume $\to$ VolumeDistribuito.ID
   - AllocazioneDistribuita.ID_Nodo $\to$ Nodo.ID
