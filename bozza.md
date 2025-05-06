@@ -232,7 +232,8 @@ Nel caso si fosse deciso di accorpare le tre specializzazioni in un'unica entit√
 
 ![Progettazione concettuale](/assets/ER_Refurbished.jpg)
 #### Schema relazionale
-- **Utente**(<u>Username</u>, Password, Ruolo)
+- **Developer**(<u>Username</u>, Password)
+- **Admin**(<u>Username</u>, Password)
 - **Servizio**(<u>Nome</u>, Immagine, NumeroRepliche, Developer)
   - Servizio.Developer $\to$ Utente.Username
 - **Deployment**(<u>ID</u>, Ambiente, Esito, NumeroServizi, ID_Deployment_Precedente$^*$, ID_Developer)
