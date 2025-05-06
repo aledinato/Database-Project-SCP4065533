@@ -211,6 +211,24 @@ Inoltre consideriamo che vengono creati in media 3 deployment al giorno (dev, te
   Noi scegliamo di mantenerlo per semplificare le query ed evitare il calcolo del numero di servizi associati ad un deployment.
 
 #### Eliminazione delle generalizzazioni
+Le generalizzazioni descritte nello schema concettuale vengono ristrutturate con l'obiettivo di eliminare le ridondanze e semplificare il modello relazionale.
+Le due entità coinvolte sono:
+- **Utente**: la generalizzazione di utente in admin e developer è necessaria per la separazione dei privilegi, in quanto admin e developer hanno compiti diversi, ma convididono gli stessi attributi.
+Perciò si decide di partizionare l'entità *Utente* in *Admin* e *Developer* con lo scopo di minimizzare le ridondanze e mantenere i vincoli relativi ai privilegi del tipo di utente.
+Questa scelta aumenta il numero di tabelle, ma diminuisce il numero di attributi.
+Nel caso si fosse deciso di accorpare le due specializzazioni in un'unica entità, si sarebbe perso il vincolo dei privilegi per tipo di utente e si sarebbe dovuto aggiungere un attributo *Ruolo* per identificare il tipo di utente.
+È possibile fare questa scelta in quanto gli utenti admin e developer non hanno relazioni in comune.
+- **Volume**: la generalizzazione di volume in volume locale, globale e distribuito è necessaria per la distinzione logica dei volumi, in quanti i tre tipi di volume hanno relazioni e attributi diversi tra di loro.
+Perciò si decide di partizionare l'entità *Volume* in *VolumeLocale*, *VolumeGlobale* e *VolumeDistribuito* con lo scopo di separare i volumi in base alla loro tipologia e mantenere i vincoli relativi alla loro allocazione.
+Questa scelta, come nella precedente, aumenta il numero di tabelle, ma rende possibile l'implementazione di attributi e relazioni specifiche per ogni tipo di volume.
+Nel caso si fosse deciso di accorpare le tre specializzazioni in un'unica entità non sarebbe stato possibile implementare le relazioni specifiche per ogni tipo di volume, inoltre l'attributo *IndirizzoIPServer* sarebbe stato nullo per i volumi locali e distribuiti, rendendo il modello meno chiaro e meno efficiente.
+
+
+
+
+
+
+
 ![Progettazione concettuale](/assets/ER_Refurbished.jpg)
 #### Schema relazionale
 - **Utente**(<u>Username</u>, Password, Ruolo)
