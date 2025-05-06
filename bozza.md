@@ -214,7 +214,8 @@ Inoltre consideriamo che vengono creati in media 3 deployment al giorno (dev, te
 #### Eliminazione delle generalizzazioni
 ![Progettazione concettuale](/assets/ER_Refurbished.jpg)
 #### Schema relazionale
-- **Utente**(<u>Username</u>, Password, Ruolo)
+- **Developer**(<u>Username</u>, Password)
+- **Admin**(<u>Username</u>, Password)
 - **Servizio**(<u>Nome</u>, Immagine, NumeroRepliche, Developer)
   - Servizio.Developer $\to$ Utente.Username
 - **Deployment**(<u>ID</u>, Ambiente, Esito, NumeroServizi, ID_Deployment_Precedente$^*$, ID_Developer)
