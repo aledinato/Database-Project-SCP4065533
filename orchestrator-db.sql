@@ -13,7 +13,7 @@ CREATE TABLE Admins(
 CREATE TABLE Servizi(
     nome VARCHAR(64),
     immagine VARCHAR(64) NOT NULL,
-    nRepliche SMALLINT UNSIGNED NOT NULL CHECK (nRepliche >= 1), -- massimo 65.535 repliche per servizio
+    nRepliche SMALLINT NOT NULL CHECK (nRepliche >= 1), -- massimo circa 32.767 repliche per servizio
     developer_id VARCHAR(64) NOT NULL,
     PRIMARY KEY(nome),
     FOREIGN KEY(developer_id) REFERENCES Developers(username) ON DELETE RESTRICT
@@ -23,7 +23,7 @@ CREATE TABLE Deployments(
     id CHAR(32), -- adottiamo UUID4 per generare gli UUID
     esito VARCHAR(64), -- nullable
     ambiente VARCHAR(64) NOT NULL,
-    nServizi SMALLINT UNSIGNED NOT NULL CHECK (nServizi >= 1), -- massimo 65.535 servizi per deployment
+    nServizi SMALLINT NOT NULL CHECK (nServizi >= 1), -- massimo circa 32.767 servizi per deployment
     developer_id VARCHAR(64) NOT NULL,
     versione_precedente CHAR(32),
     PRIMARY KEY(id),
@@ -61,7 +61,7 @@ CREATE TABLE Containers(
 
 CREATE TABLE VolumiLocali(
     id CHAR(32),
-    dimensione INT UNSIGNED NOT NULL,
+    dimensione INT NOT NULL CHECK (dimensione > 0),
     path_fisico VARCHAR(255) NOT NULL,
     nodo_id VARCHAR(64) NOT NULL,
     PRIMARY KEY(id),
@@ -70,7 +70,7 @@ CREATE TABLE VolumiLocali(
 
 CREATE TABLE VolumiGlobali(
     id CHAR(32),
-    dimensione INT UNSIGNED NOT NULL,
+    dimensione INT NOT NULL CHECK (dimensione > 0),
     path_fisico VARCHAR(255) NOT NULL,
     indirizzo_IP_server VARCHAR(15) NOT NULL, -- consideriamo IPV4
     PRIMARY KEY(id)
@@ -78,7 +78,7 @@ CREATE TABLE VolumiGlobali(
 
 CREATE TABLE VolumiDistribuiti(
     id CHAR(32),
-    dimensione INT UNSIGNED NOT NULL,
+    dimensione INT NOT NULL CHECK (dimensione > 0),
     path_fisico VARCHAR(255) NOT NULL,
     PRIMARY KEY(id)
 );
