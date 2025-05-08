@@ -3,7 +3,7 @@
 Questo progetto ha lo scopo di realizzare una base di dati per un Orchestrator come Docker Swarm o Kubernetes.
 Un orchestrator è un software che permette di gestire e coordinare più container Docker in un cluster.
 In un orchestrator ci possono essere **utenti** con diversi privilegi, nel nostro caso ci sono due tipi di utenti: *admin* e *developer*.
-Il primo gestisce la parte infrastrutturale quali i **nodi** e i **volumi**, mentre il secondo coordina la creazione di **servizi** e **deployment**.
+Il primo gestisce la parte infrastrutturale quali i **nodi**, mentre il secondo coordina la creazione di **servizi** e **deployment**.
 I **container** sono l'effettiva entità che eseguono i microservizi, essi risiedono in un **nodo** che può essere qualsiasi macchina con installato Docker, come per esempio una macchina virtuale o un'istanza EC2 su AWS.
 Inoltre i container hanno bisogno di salvare i dati persistenti nei **volumi**, che possono essere di tre tipi:
 - Il *volume locale* può essere montato su più container, ma sempre nello stesso nodo.
@@ -22,7 +22,7 @@ Contengono le seguenti informazioni:
 
 Gli utenti possono essere di due tipi: **admin** e **developer**
 
-- **Utenti admin**: hanno il compito di creare e gestire nodi e volumi, quindi la parte infrastrutturale dell'orchestrator.
+- **Utenti admin**: hanno il compito di creare e gestire nodi, quindi la parte infrastrutturale dell'orchestrator.
   
 - **Utenti developer**: hanno il compito di creare e gestire servizi e deployment, quindi la parte applicativa dell'orchestrator.
   
@@ -66,7 +66,7 @@ Il deployment ha associato più servizi e può essere creato solo da un develope
 Inoltre è possibile creare uno storico dei deployment, quindi quando si crea un nuovo deployment il precedente viene associato a quello nuovo come "padre".
 
 ## Progettazione concettuale
-![Progettazione concettuale](/assets/ER.jpg)
+![Progettazione concettuale](./assets/ER.jpg)
 Si vuole realizzare una base di dati per la gestione di un orchestrator che gestisce i container Docker in un cluster.
 Un cluster contiene diversi nodi, di cui si vogliono memorizzare indirizzo IP, nome del sistema operativo e stato ("Up", "Down" e "Drain"). Ogni nodo è identificato da un proprio hostname univoco.
 Su ogni nodo possono essere ospitati diversi container Docker, di cui è di interesse conoscere nome e stato.
@@ -87,7 +87,7 @@ Questa sezione descrive la progettazione logica dato lo schema concettuale svilu
 |-----------|-----------|-----------|-----------|
 | Utente | Utente che gestisce l'orchestrator | *Username, Password, Ruolo* | *Username* |
 | Developer | Utente che gestisce i servizi e i deployment | |  |
-| Admin | Utente che gestisce i nodi e i volumi | |  |
+| Admin | Utente che gestisce i nodi | |  |
 | Nodo | Macchina fisica o virtuale che esegue i container Docker | *Hostname, Indirizzo IP, OS, Stato* | *Hostname* |
 | Container | Entità che esegue i microservizi | *Nome, Stato* | *Nome, NomeServizio* |
 | Volume | Entità che permette di salvare dati persistenti | *ID, Dimensione, PathFisico* | *ID* |
@@ -110,6 +110,9 @@ Questa sezione descrive la progettazione logica dato lo schema concettuale svilu
 | Allocazione distribuita | Allocazione volume distribuito su più nodi | VolumeDistribuito, Nodo | |
 | Allocazione locale | Allocazione volume locale in un nodo | VolumeLocale, Nodo | |
 | Versione precedente | Associazione deployment alla sua versione precedente | Deployment, Deployment | |
+#### Ristrutturazione attributi multipli
+Nello schema concettuale notiamo che nella relazione *Montaggio* è presente un attributo *permessi* che rappresenta i permessi di accesso al volume montato sul container.
+Questo attributo potrebbe essere ristrutturato come tabella a parte, tuttavia in Linux i permessi vengono espressi come stringa perciò non c'è necessità di ristrutturarlo.
 #### Analisi delle ridondanze
 Nello schema concettuale sono presenti due ridondanze da analizzare:
 - **Numero Repliche**, in *Servizio*, rappresenta il numero di container replicati su più nodi, che può essere ottenuto contando i container con lo stesso servizio.
@@ -132,6 +135,7 @@ Sempre ipotizzando una media di 10 modifiche per ogni servizio al giorno, l'attr
       |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
       | Container  | E | 1 | S | 500|
       | Part-of  | R | 1 | S | 500|
+      | Ospitazione | R | 1 | S | 500|
       | Servizio | E | 1  | L | 500|
       | Servizio | E | 1  | S | 500|
 
@@ -142,7 +146,7 @@ Sempre ipotizzando una media di 10 modifiche per ogni servizio al giorno, l'attr
       | Servizio | E | 1  | L | 1000|
 
     Assumendo costo doppio per gli accessi in scrittura:
-    $$ \text{CostoTotale}_{ConRidondanza} = (500 \cdot 2) \cdot 3 + 500 + 1000 = 4500$$
+    $$ \text{CostoTotale}_{ConRidondanza} = (500 \cdot 2) \cdot 4 + 500 + 1000 = 5500$$
 
   - **SENZA RIDONDANZA**
     - Operazione 1:
@@ -150,6 +154,7 @@ Sempre ipotizzando una media di 10 modifiche per ogni servizio al giorno, l'attr
       |:-----------:|:-----------:|:-----------:|:-----------:|:-----------:|
       | Container  | E | 1 | S | 500|
       | Part-of  | R | 1 | S | 500|
+      | Ospitazione | R | 1 | S | 500|
 
     - Operazione 2:
 
@@ -158,9 +163,9 @@ Sempre ipotizzando una media di 10 modifiche per ogni servizio al giorno, l'attr
       | Servizio | E | 1  | L | 1000|
       | Part-of | R | 20 | L | 1000|
     Assumendo costo doppio per gli accessi in scrittura:
-    $$ \text{CostoTotale}_{SenzaRidondanza} = (500 \cdot 2) \cdot 2 + 1000 + 1000 \cdot 20 = 23000 $$
+    $$ \text{CostoTotale}_{SenzaRidondanza} = (500 \cdot 2) \cdot 3 + 1000 + 1000 \cdot 20 = 24000 $$
 
-  L'analisi suggerisce che l'attributo **Numero Repliche** è necessario, in quanto il costo totale con ridondanza è 5 volte inferiore rispetto al costo totale senza ridondanza.
+  L'analisi suggerisce che l'attributo **Numero Repliche** è necessario, in quanto il costo totale con ridondanza è 4 volte inferiore rispetto al costo totale senza ridondanza e considerando l'alto volume di accessi sia in lettura che in scrittura risulta fondamentale mantenere l'attributo.
 
 - **Numero Servizi**, in *Deplyment*, rappresenta il numero di servizi associati ad un deployment, che può essere ottenuto contando i servizi con lo stesso deployment.
 Questo attributo non viene mai modificato dato che si preferisce crearne uno di nuovo al posto di modificarne uno già esistente per favorire il versionamento dei deployment.
@@ -209,19 +214,17 @@ Inoltre consideriamo che vengono creati in media 3 deployment al giorno (dev, te
     $$ \text{CostoTotale}_{SenzaRidondanza} = (3 \cdot 2) + (50 \cdot 2) + 6 + (50\cdot6) = 412 $$
 
   L'analisi suggerisce che l'attributo **Numero servizi** è utile, in quanto il costo totale con ridondanze è circa 3 volte inferiore, tuttavia anche l'ipotesi di rimuoverlo sarebbe valida dato il numero di accessi è in termini assoluti molto basso.
-  Noi scegliamo di mantenerlo per semplificare le query ed evitare il calcolo del numero di servizi associati ad un deployment.
+  Noi scegliamo di mantenerlo per semplificare le query ed evitare il calcolo del numero di servizi associati ad un deployment, tuttavia è fondamentale mantenere la consistenza del numero di servizi salvato nel deployment.
 
 #### Eliminazione delle generalizzazioni
 Le generalizzazioni descritte nello schema concettuale vengono ristrutturate con l'obiettivo di eliminare le ridondanze e semplificare il modello relazionale.
 Le due entità coinvolte sono:
-- **Utente**: la generalizzazione di utente in admin e developer è necessaria per la separazione dei privilegi, in quanto admin e developer hanno compiti diversi, ma convididono gli stessi attributi.
-Perciò si decide di partizionare l'entità *Utente* in *Admin* e *Developer* con lo scopo di minimizzare le ridondanze e mantenere i vincoli relativi ai privilegi del tipo di utente.
-Questa scelta aumenta il numero di tabelle, ma diminuisce il numero di attributi.
-Nel caso si fosse deciso di accorpare le due specializzazioni in un'unica entità, si sarebbe perso il vincolo dei privilegi per tipo di utente e si sarebbe dovuto aggiungere un attributo *Ruolo* per identificare il tipo di utente.
-È possibile fare questa scelta in quanto gli utenti admin e developer non hanno relazioni in comune.
-- **Volume**: la generalizzazione di volume in volume locale, globale e distribuito è necessaria per la distinzione logica dei volumi, in quanti i tre tipi di volume hanno relazioni e attributi diversi tra di loro.
+- **Utente**: la generalizzazione di Utente in Developer e Admin è necessaria per la distinzione dei privilegi per tipo di utente, in quanto i due tipi di utente hanno relazioni totalmente diverse tra di loro, ma condividono gli stessi attributi.
+Perciò si decide di partizionare l'entità *Utente* nelle specializzazioni *Developer* e *Admin* con lo scopo di mantenere i vincoli relativi ai loro ruoli, ovvero che un developer non può creare nodi e un admin non può creare servizi e deployment.
+Questa scelta aumenta il numero di tabelle, ma oltre a mantenere i vincoli precedentemente descritti, riduce al minimo i valori nulli e non richiede l'aggiunta dell'attributo *Ruolo*.
+- **Volume**: la generalizzazione di Volume in Volume Locale, Globale e Distribuito è necessaria per la distinzione logica dei volumi, in quanto i tre tipi di volume hanno relazioni e attributi diversi tra di loro.
 Perciò si decide di partizionare l'entità *Volume* in *VolumeLocale*, *VolumeGlobale* e *VolumeDistribuito* con lo scopo di separare i volumi in base alla loro tipologia e mantenere i vincoli relativi alla loro allocazione.
-Questa scelta, come nella precedente, aumenta il numero di tabelle, ma rende possibile l'implementazione di attributi e relazioni specifiche per ogni tipo di volume.
+Questa scelta aumenta il numero di tabelle, ma rende possibile l'implementazione di attributi e relazioni specifiche per ogni tipo di volume, inoltre riduce al minimo il numero di valori nulli.
 Nel caso si fosse deciso di accorpare le tre specializzazioni in un'unica entità non sarebbe stato possibile implementare le relazioni specifiche per ogni tipo di volume, inoltre l'attributo *IndirizzoIPServer* sarebbe stato nullo per i volumi locali e distribuiti, rendendo il modello meno chiaro e meno efficiente.
 
 
@@ -230,26 +233,26 @@ Nel caso si fosse deciso di accorpare le tre specializzazioni in un'unica entit�
 
 
 
-![Progettazione concettuale](/assets/ER_Refurbished.jpg)
+![Progettazione concettuale](./assets/ER_Refurbished.jpg)
 #### Schema relazionale
-- **Developer**(<u>Username</u>, Password)
-- **Admin**(<u>Username</u>, Password)
-- **Servizio**(<u>Nome</u>, Immagine, NumeroRepliche, Developer)
+- **Developers**(<u>Username</u>, Password)
+- **Admins**(<u>Username</u>, Password)
+- **Servizi**(<u>Nome</u>, Immagine, NumeroRepliche, Developer)
   - Servizio.Developer $\to$ Utente.Username
-- **Deployment**(<u>ID</u>, Ambiente, Esito, NumeroServizi, ID_Deployment_Precedente$^*$, ID_Developer)
+- **Deployments**(<u>ID</u>, Ambiente, Esito, NumeroServizi, ID_Deployment_Precedente$^*$, ID_Developer)
   - Deployment.ID_Developer $\to$ Utente.Username
   - Deployment.ID_Deployment_Precedente $\to$ Deployment.ID
-- **ServizioDeployment**(NomeServizio, ID_Deployment)
-  - ServizioDeployment.ID_Deployment $\to$ Deployment.ID
-  - ServizioDeployment.NomeServizio $\to$ Servizio.Nome
-- **Nodo**(<u>Hostname</u>, IP, OS, Status, ID_Admin)
+- **ServiziDeployed**(NomeServizio, ID_Deployment)
+  - ServiziDeployed.ID_Deployment $\to$ Deployment.ID
+  - ServiziDeployed.NomeServizio $\to$ Servizio.Nome
+- **Nodi**(<u>Hostname</u>, IP, OS, Status, ID_Admin)
   - Nodo.ID_Admin $\to$ Utente.Username
-- **Container**(<u>Nome, NomeServizio</u>, Stato)
+- **Containers**(<u>Nome, NomeServizio</u>, Stato)
   - Container.NomeServizio $\to$ Servizio.Nome
-- **VolumeLocale**(<u>ID</u>, Dimensione, PathFisico, ID_Nodo)
+- **VolumiLocali**(<u>ID</u>, Dimensione, PathFisico, ID_Nodo)
   - VolumeLocale.ID_Nodo $\to$ Nodo.Hostname
-- **VolumeGlobale**(<u>ID</u>, Dimensione, PathFisico, IndirizzoIPServer)
-- **VolumeDistribuito**(<u>ID</u>, Dimensione, PathFisico)
+- **VolumiGlobali**(<u>ID</u>, Dimensione, PathFisico, IndirizzoIPServer)
+- **VolumiDistribuiti**(<u>ID</u>, Dimensione, PathFisico)
 - **VolumiLocaliContainer**(<u>ID_Volume, ID_Container, NomeServizioContainer</u>, PathMontaggio, Permessi)
   - VolumiLocaliContainer.ID_Volume $\to$ VolumeLocale.ID
   - VolumiLocaliContainer.(ID_Container, NomeServizioContainer) $\to$ Container.(Nome, NomeServizio)

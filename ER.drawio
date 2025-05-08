@@ -319,7 +319,7 @@
             <mxPoint x="580" y="560" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="UmrRzRvC02uneNPQCRzM-140" value="" style="endArrow=oval;html=1;rounded=0;exitX=1;exitY=0.633;exitDx=0;exitDy=0;exitPerimeter=0;endFill=1;startArrow=oval;startFill=1;" parent="1" edge="1" source="UmrRzRvC02uneNPQCRzM-46">
+        <mxCell id="UmrRzRvC02uneNPQCRzM-140" value="" style="endArrow=oval;html=1;rounded=0;exitX=1;exitY=0.633;exitDx=0;exitDy=0;exitPerimeter=0;endFill=1;startArrow=oval;startFill=1;" parent="1" source="UmrRzRvC02uneNPQCRzM-46" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="580" y="610" as="sourcePoint" />
             <mxPoint x="580" y="600" as="targetPoint" />
@@ -451,6 +451,9 @@
         </mxCell>
         <mxCell id="z4jrUQKfOhYMJ2uNWXJ5-15" value="path fisico" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" parent="1" vertex="1">
           <mxGeometry x="500" y="810" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="c3k1VJnnf18YygD1ExeG-1" value="(0,1)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="307.5" y="545" width="50" height="30" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
