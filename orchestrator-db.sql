@@ -1,3 +1,18 @@
+DROP TABLE IF EXISTS MontaggiDistribuiti CASCADE;
+DROP TABLE IF EXISTS MontaggiGlobali CASCADE;
+DROP TABLE IF EXISTS MontaggiLocali CASCADE;
+DROP TABLE IF EXISTS AllocazioniDistribuite CASCADE;
+DROP TABLE IF EXISTS VolumiDistribuiti CASCADE;
+DROP TABLE IF EXISTS VolumiGlobali CASCADE;
+DROP TABLE IF EXISTS VolumiLocali CASCADE;
+DROP TABLE IF EXISTS Containers CASCADE;
+DROP TABLE IF EXISTS Nodi CASCADE;
+DROP TABLE IF EXISTS ServiziDeployed CASCADE;
+DROP TABLE IF EXISTS Deployments CASCADE;
+DROP TABLE IF EXISTS Servizi CASCADE;
+DROP TABLE IF EXISTS Admins CASCADE;
+DROP TABLE IF EXISTS Developers CASCADE;
+
 CREATE TABLE Developers(
     username VARCHAR(64),
     password CHAR(60) NOT NULL, -- lunghezza hash bcrypt
@@ -172,18 +187,18 @@ EXECUTE FUNCTION aggiorna_num_servizi();
 CREATE FUNCTION controllo_allocazione_stesso_nodo_locale()
 RETURNS TRIGGER AS $$
 DECLARE
-    nodo_id VARCHAR(64);
+    volume_nodo_id VARCHAR(64);
     container_nodo_id VARCHAR(64);
 BEGIN
     SELECT nodo_id INTO container_nodo_id
     FROM Containers
     WHERE nome = NEW.container_nome AND servizio_id = NEW.container_servizio_id;
 
-    SELECT nodo_id INTO nodo_id
+    SELECT nodo_id INTO volume_nodo_id
     FROM VolumiLocali
     WHERE VolumiLocali.id = NEW.volume_id;
 
-    IF container_nodo_id IS NULL OR nodo_id IS NULL OR container_nodo_id != nodo_id THEN
+    IF container_nodo_id IS NULL OR volume_nodo_id IS NULL OR container_nodo_id != volume_nodo_id THEN
         RAISE EXCEPTION 'Volume locale e container devono essere allocati sullo stesso nodo.';
     END IF;
 
@@ -222,3 +237,56 @@ BEFORE INSERT ON MontaggiDistribuiti
 FOR EACH ROW
 EXECUTE FUNCTION controllo_allocazione_stesso_nodo_distribuito();
 
+INSERT INTO Developers (username, password) VALUES
+('giulia_dev', 'bcrypt_hash_pw1'),
+('marco_dev', 'bcrypt_hash_pw2');
+
+INSERT INTO Admins (username, password) VALUES
+('luca_admin', 'bcrypt_hash_pw3'),
+('elena_admin', 'bcrypt_hash_pw4');
+
+INSERT INTO Servizi (nome, immagine, num_repliche, developer_id) VALUES
+('servizio-autenticazione', 'autenticazione:v1.0', 3, 'giulia_dev'),
+('servizio-fatturazione', 'fatturazione:v2.1', 1, 'marco_dev');
+
+INSERT INTO Nodi (hostname, indirizzo_IP, stato, sistema_operativo, admin_id) VALUES
+('nodo-1', '192.168.0.10', 'attivo', 'Ubuntu 22.04', 'luca_admin'),
+('nodo-2', '192.168.0.11', 'attivo', 'Debian 12', 'elena_admin');
+
+INSERT INTO Containers (nome, stato, nodo_id, servizio_id) VALUES
+('contenitore-auth-1', 'in esecuzione', 'nodo-1', 'servizio-autenticazione'),
+('contenitore-auth-2', 'in esecuzione', 'nodo-1', 'servizio-autenticazione'),
+('contenitore-auth-3', 'in esecuzione', 'nodo-2', 'servizio-autenticazione'),
+('contenitore-fatt-1', 'in esecuzione', 'nodo-2', 'servizio-fatturazione');
+
+INSERT INTO Deployments (id, esito, ambiente, num_servizi, developer_id, versione_precedente) VALUES
+('deploy-001', 'successo', 'produzione', 1, 'giulia_dev', NULL),
+('deploy-002', NULL, 'test', 2, 'marco_dev', 'deploy-001');
+
+INSERT INTO ServiziDeployed (servizio_id, deployment_id) VALUES
+('servizio-autenticazione', 'deploy-001'),
+('servizio-autenticazione', 'deploy-002'),
+('servizio-fatturazione', 'deploy-002');
+
+INSERT INTO VolumiLocali (id, dimensione, path_fisico, nodo_id) VALUES
+('vol-loc-001', 10240, '/mnt/dati/auth', 'nodo-1'),
+('vol-loc-002', 20480, '/mnt/dati/fatt', 'nodo-2');
+
+INSERT INTO MontaggiLocali (path_montaggio, permessi, container_nome, container_servizio_id, volume_id) VALUES
+('/app/dati', 'rw', 'contenitore-auth-1', 'servizio-autenticazione', 'vol-loc-001'),
+('/app/fatture', 'rw', 'contenitore-fatt-1', 'servizio-fatturazione', 'vol-loc-002');
+
+INSERT INTO VolumiGlobali (id, dimensione, path_fisico, indirizzo_IP_server) VALUES
+('vol-glob-001', 51200, '/srv/globali/auth', '10.10.0.1');
+
+INSERT INTO MontaggiGlobali (path_montaggio, permessi, container_nome, container_servizio_id, volume_id) VALUES
+('/condiviso/auth', 'rw', 'contenitore-auth-1', 'servizio-autenticazione', 'vol-glob-001');
+
+INSERT INTO VolumiDistribuiti (id, dimensione, path_fisico) VALUES
+('vol-dist-001', 40960, '/srv/distribuiti/fatturazione');
+
+INSERT INTO AllocazioniDistribuite (nodo_id, volume_id) VALUES
+('nodo-2', 'vol-dist-001');
+
+INSERT INTO MontaggiDistribuiti (path_montaggio, permessi, container_nome, container_servizio_id, volume_id) VALUES
+('/distribuiti/fatt', 'rw', 'contenitore-fatt-1', 'servizio-fatturazione', 'vol-dist-001');
