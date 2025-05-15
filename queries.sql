@@ -2,8 +2,9 @@
 -- Tutto il versionamento dei deployment con i developer associati usando CTE(common table expression)
 WITH RECURSIVE VersioniDeployments AS (
     SELECT id, ambiente, num_servizi, esito, username AS dev_username
-    FROM Deployments WHERE id = <id>
+    FROM Deployments
     JOIN Developers ON Developers.username = Deployments.developer_id
+    WHERE id = <id>
 
     UNION ALL
 
@@ -58,7 +59,7 @@ AND VolumiInLetturaPerContainer.num_volumi_lettura = VolumiPerContainer.num_volu
 SELECT Containers.nodo_id, COUNT(DISTINCT servizio_id) AS num_servizi, Admins.username
 FROM Containers
 JOIN Admins ON Admins.username = Containers.nodo_id
-GROUP BY Containers.nodo_id, Admins.nome
+GROUP BY Containers.nodo_id, Admins.username
 ORDER BY num_servizi ASC
 LIMIT 1;
 
@@ -67,5 +68,5 @@ LIMIT 1;
 -- Container/s con meno spazio a disposizione in kb
 SELECT container_nome, container_servizio_id, SUM(dimensione) AS spazio_disponibile
 FROM Montaggi
-GROUP BY container_nome, container_servizio_id;
+GROUP BY container_nome, container_servizio_id
 ORDER BY SpazioDisponibilePerContainer.spazio_disponibile ASC;
