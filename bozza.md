@@ -75,7 +75,7 @@ Per quanto riguarda **servizi** e **deployment**, la traduzione dall'analisi dei
 
 Vi è poi la gestione della struttura fisica del cluster, che comprende **nodi, container e volumi**, a cui spetta il compito di far funzionare i servizi.
 Sulla relazione **container-servizi**, è fondamentale che un servizio abbia almeno un container per essere effettivamente eseguito, e che un container sia parte di uno e un solo servizio (non si prevedono container "orfani", ovvero che non fanno parte di nessun servizio).
-Ciascun container opera su diversi volumi, utilizzati come file system, e un volume può anche essere condiviso tra più container. Ciascun volume è visto da un container con un percorso distinto e ciascun container dispone di permessi specifici su ognuno dei suoi volumi (lettura, scrittura, esecuzione, ecc.). I volumi, anche se condivisi da più container, dispongono di un proprio percorso fisico ed è di interesse memorizzarne la dimensione (in KB) e il tipo (locale, globale e distribuito).  
+Ciascun container opera su diversi volumi, utilizzati come file system, e un volume può anche essere condiviso tra più container. Ciascun volume è visto da un container con un percorso distinto e ciascun container dispone di permessi specifici su ognuno dei suoi volumi (lettura, scrittura ed esecuzione). I volumi, anche se condivisi da più container, dispongono di un proprio percorso fisico ed è di interesse memorizzarne la dimensione (in KB) e il tipo (locale, globale e distribuito).  
 Ad esempio, un volume $A$ di qualsiasi tipo, con percorso '<u>/volumes/A</u>', può essere montato a due diversi container: il container $C_1$, che lo vede con il percorso '<u>/var/files</u>' e su cui dispone di tutti i permessi, e il container $C_2$, che lo vede con percorso '<u>/data/read</u>', a cui può accedere in sola lettura. Dunque se $C_1$ vuole accedere al file fisico '<u>/volumes/A</u>/net/hosts.txt' lo potrà fare con il percorso '<u>/var/files</u>/net/hosts.txt'.  
 Mentre un **volume locale** può essere allocato ad un solo nodo, i **volumi distribuiti** possono essere allocati su più nodi. I **volumi globali**, a differenza degli altri due tipi, non sono allocati a nessun nodo, e sono accessibili da tutti i container con un proprio indirizzo IP, che va quindi memorizzato. Un qualsiasi volume può anche non essere associato a nessun container, ma è comunque allocato ad un nodo. Ciascun tipo di volume è quindi reificato in una entità propria, in modo da forzare le distinzioni di cardinalità nelle relazioni di montaggio con i volumi e di allocazione ai nodi.
 
@@ -121,8 +121,9 @@ Questa sezione descrive la progettazione logica dato lo schema concettuale svilu
 | Versione precedente | Associazione deployment alla sua versione precedente | Deployment, Deployment | |
 
 #### Ristrutturazione attributi multipli
-Nello schema concettuale notiamo che nella relazione *Montaggio* è presente un attributo *permessi* che rappresenta i permessi di accesso al volume montato sul container.  
-Questo attributo potrebbe essere ristrutturato come tabella a parte, tuttavia in Linux i permessi vengono espressi come stringa perciò non c'è necessità di ristrutturarlo.  
+Nello schema concettuale notiamo che nella relazione *Montaggio* è presente un attributo *permessi* che rappresenta i permessi di accesso al volume montato sul container e ai file contenuti.  
+Questo attributo potrebbe essere ristrutturato come tabella a parte, tuttavia in Linux i permessi vengono espressi come stringa perciò non c'è necessità di ristrutturarlo.
+I permessi possibili sono *read*('r'), *write*('w') e *execute*('x'), un volume che vuole avere tutti e tre i permessi avrà come stringa 'rwx', mentre un volume che vuole avere solo il permesso di lettura avrà come stringa 'r--'.
 
 #### Analisi delle ridondanze
 Nello schema concettuale sono presenti due ridondanze da analizzare:  
