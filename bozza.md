@@ -1,5 +1,20 @@
-# Progetto Basi di Dati: Sistema di Gestione Orchestrator
-## Abstract
+---
+title: | 
+  \begin{center}
+    \includegraphics[width=5cm]{./assets/unipd-logo.jpg}\\[1em]
+    Progetto Basi di Dati: Sistema di Gestione Orchestrator
+  \end{center}
+author: "Alessandro Dinato, Filippo Rampazzo"
+toc: true
+toc-title: "Indice"
+toc-before: true
+header-includes:
+  - \usepackage{graphicx}
+---
+
+\newpage 
+
+# Abstract
 Questo progetto ha lo scopo di realizzare una base di dati per un Orchestrator come Docker Swarm o Kubernetes.  
 Un orchestrator è un software che permette di gestire e coordinare più container Docker in un cluster.  
 In un orchestrator ci possono essere **utenti** con diversi privilegi, nel nostro caso ci sono due tipi di utenti: *admin* e *developer*.  
@@ -14,13 +29,14 @@ Inoltre i container hanno bisogno di salvare i dati persistenti all'interno dei 
 Il developer ha il compito di creare **servizi** e **deployment**, dove i servizi sono un insieme di container replicati su più nodi e i deployment sono un insieme di servizi che rappresentano il rilascio di una nuova versione dell'applicativo.  
 L'obiettivo è garantire una gestione efficiente e organizzata delle informazioni così da rendere la gestione dei microservizi e del loro versionamento il più semplice possibile.  
 
-## Analisi dei requisiti
+# Analisi dei requisiti
 Questa sezione descrive i requisiti funzionali della base di dati dell'orchestrator.  
+
 - **Utenti**: ogni utente è identificato da uno *username* ed ha il ruolo di gestire tutta l'infrastruttua dell'orchestrator.  
 Contengono le seguenti informazioni:  
 
-- *username*: stringa univoca che identifica l'utente
-- *password*: stringa che rappresenta la password dell'utente   
+  - *username*: stringa univoca che identifica l'utente
+  - *password*: stringa che rappresenta la password dell'utente   
 
 Gli utenti possono essere di due tipi: **admin** e **developer**  
 
@@ -43,7 +59,7 @@ I container possono avere associati più volumi che però sono allocati su un no
 Inoltre i container possono accedere a path limitati e diverse del volume con permessi differenti, come per esempio lettura e scrittura.
 - **Volumi**: sono le entità che permettono di salvare dati persistenti dei container Docker.  
 Contengono le seguenti informazioni:
-    - *id*: stringa che identifica il volume
+    - *nome*: nome che identifica il volume
     - *dimensione*: numero che rappresenta la dimensione del volume in termini di spazio
     - *path fisico*: stringa che rappresenta il path fisico del volume all'interno del nodo  
 I volumi possono essere di tre tipi: **locale**, **globale** e **distribuito**.
@@ -60,15 +76,17 @@ I servizi sono creati e gestiti da un developer, il quale può creare più servi
 I servizi hanno più container associati (le "repliche"), potenzialmente anche sullo stesso nodo.  
 - **Deployment**: sono un astrazione che rappresenta un insieme di servizi che vengono rilasciati in una nuova versione dell'applicativo.  
 Contengono le seguenti informazioni:
-    - *ID*: stringa che identifica il deployment
+    - *nome*: nome che dà contesto al deployment
     - *ambiente*: ambiente in cui viene eseguito il deployment (sviluppo, test, produzione)
     - *esito*: esito del deployment (success, running, failed)
     - *numero servizi*: numero di servizi che lo compongono  
+I deployment sono identificati da il nome e l'ambiente in cui vengono eseguiti, così da avere lo stesso nome in ambienti diversi (esempio: ecommerce-dev, ecommerce-prod).
 Il deployment ha associato più servizi e può essere creato solo da un developer.  
 Inoltre è possibile creare uno storico dei deployment, quindi quando si crea un nuovo deployment il precedente viene associato a quello nuovo come "padre".
 
-## Progettazione concettuale
-![Progettazione concettuale](./assets/ER.jpg)
+# Progettazione concettuale
+![Progettazione concettuale](./assets/ER.jpg)  
+
 Come da analisi dei requisiti, esistono due tipi di utenti: **amministratori** (admin) e **sviluppatori** (developer). Questi si traducono in due entità separate, ciascuno con un proprio nome utente e password (da memorizzare criptata), scelta presa in quanto amministratori e sviluppatori hanno ruoli e responsabilità ben distinti sia a livello di base di dati (relazioni) che a livello di funzioni e permessi.
 
 Per quanto riguarda **servizi** e **deployment**, la traduzione dall'analisi dei requisiti avviene in modo abbastanza diretto. Un servizio, identificato da un proprio nome, può essere parte di uno o più deployment, mentre un deployment, che è per definizione un insieme di servizi, deve contenere almeno uno di essi (non è possibile effettuare deployment "vuoti"). Di ciascun deployment è anche possibile (e preferibile) memorizzare la versione precedente, oltre che per motivi di cronologia, anche per poter effettuare un *rollback* in caso il deployment non vada a buon fine. Non è necessario che il deployment che contiene un servizio sia effettuato dallo stesso utente che ha creato il servizio stesso.
@@ -81,17 +99,28 @@ Mentre un **volume locale** può essere allocato ad un solo nodo, i **volumi dis
 
 Vi sono infine i **nodi**, che costituiscono l'unità fondamentale del cluster. I nodi ospitano fisicamente una serie di container ma possono anche essere vuoti; dall'altra parte, un container è necessariamente ospitato in uno e un solo nodo. Ciascun nodo è identificato da un proprio hostname univoco, e può trovarsi in tre stati: "Up", "Down" e "Drain", che sono quindi un tipo enumerativo. Al fine di funzionare, inoltre, a ciascun nodo possono essere allocati diversi volumi; si noti che un nodo può non avere volumi allocati solo se non ospita nessun container.
 
-Il diagramma ER non permette di rappresentare il seguente vincolo che si evince dall'analisi dei requisiti: un volume può essere associato a un container e allocato in un nodo solo se il nodo padre del container è lo stesso a cui è allocato il volume.  
+Il diagramma ER non permette di rappresentare i seguente vincoli che si evincono dall'analisi dei requisiti:  
+
+- un volume può essere associato a un container e allocato in un nodo solo se il nodo padre del container è lo stesso a cui è allocato il volume.  
 Sia $V$ l'insieme dei Volumi, $C$ l'insieme dei Container e $N$ l'insieme dei Nodi, allora:
 $$
 \forall v \in V \backslash \{\text{volumi globali}\}, c \in C, n \in N: v \in Montato(c), n \in Allocazione(v) \Rightarrow n \in Ospitazione(c)
 $$  
 
-## Progettazione logica
+- un deployment può avere come versione precedente qualsiasi deployment, eccetto se stesso e un deployment che ha come versione precedente una versiona successiva ad esso.  
+Sia $D$ l'insieme dei Deployment, allora:
+
+$$ \forall d' \in D, \exists p \in D, \exists d \in D: d' \in VersioniPrecedenti(d') \vee $$
+$$ (d \in VersioniPrecedenti(d') \land d' \in VersioniPrecedenti(p) \land p \in VersioniPrecedenti(d)) \Rightarrow d' \notin D $$
+
+
+# Progettazione logica
 Questa sezione descrive la progettazione logica dato lo schema concettuale sviluppato nella sezione precedente, con lo scopo di analizzare le ridondanze ed eliminare le generalizzazioni.  
 
-#### Tabella Entità-Relazioni
-###### Tabella delle entità
+## Tabella Entità-Relazioni  
+
+### Tabella delle entità  
+
 | Entità | Descrizione | Attributi | Identificatore |
 |-----------|-----------|-----------|-----------|
 | Utente | Utente che gestisce l'orchestrator | *Username, Password, Ruolo* | *Username* |
@@ -99,14 +128,15 @@ Questa sezione descrive la progettazione logica dato lo schema concettuale svilu
 | Admin | Utente che gestisce i nodi | |  |
 | Nodo | Macchina fisica o virtuale che esegue i container Docker | *Hostname, Indirizzo IP, OS, Stato* | *Hostname* |
 | Container | Entità che esegue i microservizi | *Nome, Stato* | *Nome, NomeServizio* |
-| Volume | Entità che permette di salvare dati persistenti | *ID, Dimensione, PathFisico* | *ID* |
+| Volume | Entità che permette di salvare dati persistenti | *Nome, Dimensione, PathFisico* | *Nome* |
 | VolumeLocale | Volume allocato in un nodo | | |
 | VolumeGlobale | Volume allocato in un server remoto | *IndirizzoIPServer* | |
 | VolumeDistribuito | Volume allocato su più nodi | | |
 | Servizio | Astrazione che rappresenta un insieme di container replicati su più nodi | *Nome, Immagine, NumeroRepliche* | *Nome* |
-| Deployment | Astrazione che rappresenta un insieme di servizi rilasciati in una nuova versione dell'applicativo | *ID, Ambiente, Esito, NumeroServizi* | *ID* |
+| Deployment | Astrazione che rappresenta un insieme di servizi rilasciati in una nuova versione dell'applicativo | *Nome, Ambiente, Esito, NumeroServizi* | *Nome, Ambiente* |
 
-###### Tabella delle relazioni
+### Tabella delle relazioni  
+
 | Relazione | Descrizione | Componente | Attributi |
 |-----------|-----------|-----------|-----------|
 | Sviluppo | Sviluppo servizio da parte di un developer | Developer, Servizio | |
@@ -120,12 +150,14 @@ Questa sezione descrive la progettazione logica dato lo schema concettuale svilu
 | Allocazione locale | Allocazione volume locale in un nodo | VolumeLocale, Nodo | |
 | Versione precedente | Associazione deployment alla sua versione precedente | Deployment, Deployment | |
 
-#### Ristrutturazione attributi multipli
+## Ristrutturazione attributi multipli  
+
 Nello schema concettuale notiamo che nella relazione *Montaggio* è presente un attributo *permessi* che rappresenta i permessi di accesso al volume montato sul container e ai file contenuti.  
-Questo attributo potrebbe essere ristrutturato come tabella a parte, tuttavia in Linux i permessi vengono espressi come stringa perciò non c'è necessità di ristrutturarlo.
+Questo attributo potrebbe essere ristrutturato come tabella a parte, tuttavia in Linux i permessi vengono espressi come stringa perciò non c'è necessità di ristrutturarlo.  
 I permessi possibili sono *read*('r'), *write*('w') e *execute*('x'), un volume che vuole avere tutti e tre i permessi avrà come stringa 'rwx', mentre un volume che vuole avere solo il permesso di lettura avrà come stringa 'r--'.
 
-#### Analisi delle ridondanze
+## Analisi delle ridondanze  
+
 Nello schema concettuale sono presenti due ridondanze da analizzare:  
 
 - **Numero Repliche**, in *Servizio*, rappresenta il numero di container replicati su più nodi, che può essere ottenuto contando i container con lo stesso servizio.  
@@ -233,7 +265,10 @@ Inoltre consideriamo che vengono creati in media 3 deployment al giorno (dev, te
   L'analisi suggerisce che l'attributo **Numero servizi** è utile, in quanto il costo totale con ridondanze è circa 3 volte inferiore, tuttavia anche l'ipotesi di rimuoverlo sarebbe valida dato il numero di accessi è in termini assoluti molto basso.  
   Noi scegliamo di mantenerlo per semplificare le query ed evitare il calcolo del numero di servizi associati ad un deployment, tuttavia è fondamentale mantenere la consistenza del numero di servizi salvato nel deployment.  
 
-#### Eliminazione delle generalizzazioni
+Nello schema concettuale non sono presenti relazioni ridondanti, in quanto ogni relazione ha un significato ben preciso e non è possibile accorparle senza perdere informazioni.  
+Si potrebbe pensare ad eliminare la relazione *AllocazioneLocale*, ma è fondamentale perchè un volume locale può anche non essere montato su nessun container. 
+
+## Eliminazione delle generalizzazioni
 Le generalizzazioni descritte nello schema concettuale vengono ristrutturate con l'obiettivo di eliminare le ridondanze e semplificare il modello relazionale.  
 Le due entità coinvolte sono:  
 
@@ -246,43 +281,147 @@ Perciò si decide di partizionare l'entità *Volume* in *VolumeLocale*, *VolumeG
 Questa scelta aumenta il numero di tabelle, ma rende possibile l'implementazione di attributi e relazioni specifiche per ogni tipo di volume, inoltre riduce al minimo il numero di valori nulli.  
 Nel caso si fosse deciso di accorpare le tre specializzazioni in un'unica entità non sarebbe stato possibile implementare le relazioni specifiche per ogni tipo di volume, inoltre l'attributo *IndirizzoIPServer* sarebbe stato nullo per i volumi locali e distribuiti, rendendo il modello meno chiaro e meno efficiente.  
 
+![Progettazione concettuale](./assets/ER_Refurbished.jpg)  
 
-
-
-
-
-
-![Progettazione concettuale](./assets/ER_Refurbished.jpg)
-#### Schema relazionale  
+## Schema relazionale  
 
 - **Developers**(<u>username</u>, password)
 - **Admins**(<u>username</u>, password)
-- **Servizi**(<u>nome</u>, immagine, num_repliche, developer_id)
-  - Servizi.developer_id $\to$ Developers.username
-- **Deployments**(<u>id</u>, esito, ambiente, num_servizi, developer_id, versione_precedente)
-  - Deployments.developer_id $\to$ Developers.username
-  - Deployments.versione_precedente $\to$ Deployments.id
-- **ServiziDeployed**(<u>servizio_id, deployment_id</u>)
-  - ServiziDeployed.servizio_id $\to$ Servizi.nome
-  - ServiziDeployed.deployment_id $\to$ Deployments.id
-- **Nodi**(<u>hostname</u>, indirizzo_IP, stato, sistema_operativo, admin_id)
-  - Nodi.admin_id $\to$ Admins.username
-- **Containers**(<u>nome, servizio_id</u>, stato, nodo_id)
-  - Containers.servizio_id $\to$ Servizi.nome
-  - Containers.nodo_id $\to$ Nodi.hostname
-- **VolumiLocali**(<u>id</u>, dimensione, path_fisico, nodo_id)
-  - VolumiLocali.nodo_id $\to$ Nodi.hostname
-- **VolumiGlobali**(<u>id</u>, dimensione, path_fisico, indirizzo_IP_server)
-- **VolumiDistribuiti**(<u>id</u>, dimensione, path_fisico)
-- **MontaggiLocali**(<u>container_nome, container_servizio_id, volume_id</u>, path_montaggio, permessi)
-  - MontaggiLocali.(container_nome, container_servizio_id) $\to$ Containers.(nome, servizio_id)
-  - MontaggiLocali.volume_id $\to$ VolumiLocali.id
-- **MontaggiGlobali**(<u>container_nome, container_servizio_id, volume_id</u>, path_montaggio, permessi)
-  - MontaggiGlobali.(container_nome, container_servizio_id) $\to$ Containers.(nome, servizio_id)
-  - MontaggiGlobali.volume_id $\to$ VolumiGlobali.id
-- **MontaggiDistribuiti**(<u>container_nome, container_servizio_id, volume_id</u>, path_montaggio, permessi)
-  - MontaggiDistribuiti.(container_nome, container_servizio_id) $\to$ Containers.(nome, servizio_id)
-  - MontaggiDistribuiti.volume_id $\to$ VolumiDistribuiti.id
-- **AllocazioniDistribuite**(<u>nodo_id, volume_id</u>)
-  - AllocazioniDistribuite.nodo_id $\to$ Nodi.hostname
-  - AllocazioniDistribuite.volume_id $\to$ VolumiDistribuiti.id
+- **Servizi**(<u>nome</u>, immagine, num_repliche, username_developer)
+  - Servizi.username_developer $→$ Developers.username
+- **Deployments**(<u>nome</u>, esito, ambiente, num_servizi, username_developer, versione_precedente)
+  - Deployments.username_developer $→$ Developers.username
+  - Deployments.versione_precedente $→$ Deployments.nome
+- **ServiziDeployed**(<u>nome_servizio, nome_deployment, ambiente_deployment</u>)
+  - ServiziDeployed.nome_servizio $→$ Servizi.nome
+  - ServiziDeployed.(nome_deployment, ambiente_deployment) $→$ Deployments.(nome, ambiente)
+- **Nodi**(<u>hostname</u>, indirizzo_IP, stato, sistema_operativo, username_admin)
+  - Nodi.username_admin $→$ Admins.username
+- **Containers**(<u>nome, nome_servizio</u>, stato, hostname_nodo)
+  - Containers.nome_servizio $→$ Servizi.nome
+  - Containers.hostname_nodo $→$ Nodi.hostname
+- **VolumiLocali**(<u>nome</u>, dimensione, path_fisico, hostaname_nodo)
+  - VolumiLocali.hostaname_nodo $→$ Nodi.hostname
+- **VolumiGlobali**(<u>nome</u>, dimensione, path_fisico, indirizzo_IP_server)
+- **VolumiDistribuiti**(<u>nome</u>, dimensione, path_fisico)
+- **MontaggiLocali**(<u>container_nome, container_nome_servizio, nome_volume</u>, path_montaggio, permessi)
+  - MontaggiLocali.(container_nome, container_nome_servizio) $→$ Containers.(nome, nome_servizio)
+  - MontaggiLocali.nome_volume $→$ VolumiLocali.nome
+- **MontaggiGlobali**(<u>container_nome, container_nome_servizio, nome_volume</u>, path_montaggio, permessi)
+  - MontaggiGlobali.(container_nome, container_nome_servizio) $→$ Containers.(nome, nome_servizio)
+  - MontaggiGlobali.nome_volume $→$ VolumiGlobali.nome
+- **MontaggiDistribuiti**(<u>container_nome, container_nome__servizio, nome_volume</u>, path_montaggio, permessi)
+  - MontaggiDistribuiti.(container_nome, container_nome_servizio) $→$ Containers.(nome, nome_servizio)
+  - MontaggiDistribuiti.nome_volume $→$ VolumiDistribuiti.nome
+- **AllocazioniDistribuite**(<u>hostname_nodo, nome_volume</u>)
+  - AllocazioniDistribuite.hostaname_nodo $→$ Nodi.hostname
+  - AllocazioniDistribuite.nome_volume $→$ VolumiDistribuiti.nome
+
+
+# Implementazione in PostgreSQL e definizione delle query
+Il file `orchestrator-db.sql` contiene il codice SQL necessario alla creazione e il popolamento delle tabelle del database, inoltre è presente un trigger che permette di far rispettare il primo vincolo di integrità referenziale, specificato nella progettazione concettuale.  
+Inoltre contiene il codice SQL delle query e degli indici che saranno spiegati in seguito.  
+
+## Definizione delle query  
+
+### Query 1  
+
+Trovare i developer che hanno fatto almeno un determinato numeri di deployment(es. 2) in ambienti diversi per lo stesso servizio.  
+```sql
+SELECT s.username_developer, s.nome AS nome_servizio, COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti
+FROM ServiziDeployed sd
+JOIN Servizi s ON sd.nome_servizio = s.nome
+GROUP BY s.username_developer, s.nome
+HAVING COUNT(DISTINCT sd.ambiente_deployment) >= 2;
+```
+
+### Query 2  
+
+Trovare i developer con almeno un deployment in uno stato specifico (es. failed) e con media di servizi deployed maggiore di una determinata soglia (es. 5).  
+Inoltre sono ordinati per numero di deployment in quel determinato stato e per media di servizi deployed, entrambi in ordine decrescente.  
+```sql
+SELECT username_developer, COUNT(*) AS num_failed_deployments, ROUND(AVG(num_servizi), 2) AS media_servizi_deployed
+FROM Deployments
+WHERE esito = 'failed'
+GROUP BY username_developer
+HAVING AVG(num_servizi) > 5
+ORDER BY COUNT(*) DESC, AVG(num_servizi) DESC;
+```
+
+### Query 3  
+
+Trovare i container ordinati per spazio disponibile in ordine crescente e il volume più piccolo per ogni container sempre in ordine crescente.  
+```sql
+CREATE VIEW Montaggi AS
+SELECT MontaggiLocali.*, VolumiLocali.dimensione
+FROM MontaggiLocali
+JOIN VolumiLocali ON VolumiLocali.nome = MontaggiLocali.nome_volume
+UNION ALL
+SELECT MontaggiGlobali.*, VolumiGlobali.dimensione
+FROM MontaggiGlobali
+JOIN VolumiGlobali ON VolumiGlobali.nome = MontaggiGlobali.nome_volume
+UNION ALL
+SELECT MontaggiDistribuiti.*, VolumiDistribuiti.dimensione
+FROM MontaggiDistribuiti
+JOIN VolumiDistribuiti ON VolumiDistribuiti.nome = MontaggiDistribuiti.nome_volume;
+
+SELECT container_nome, container_nome_servizio, SUM(dimensione) AS spazio_volumi_totale, MIN(dimensione) AS spazio_volume_minimo
+FROM Montaggi
+GROUP BY container_nome, container_nome_servizio
+ORDER BY spazio_volumi_totale ASC, spazio_volume_minimo ASC;
+```
+
+### Query 4  
+
+Trovare i container che sono in sola lettura su tutti i volumi montati.  
+```sql
+CREATE VIEW VolumiInLetturaPerContainer AS
+SELECT container_nome, container_nome_servizio, COUNT(*) AS num_volumi_lettura
+FROM Montaggi
+WHERE permessi = 'r--'
+GROUP BY container_nome, container_nome_servizio;
+
+CREATE VIEW VolumiPerContainer AS
+SELECT container_nome, container_nome_servizio, COUNT(*) AS num_volumi
+FROM Montaggi
+GROUP BY container_nome, container_nome_servizio;
+
+SELECT VolumiPerContainer.container_nome, VolumiPerContainer.container_nome_servizio, VolumiInLetturaPerContainer.num_volumi_lettura
+FROM VolumiPerContainer
+JOIN VolumiInLetturaPerContainer 
+ON VolumiInLetturaPerContainer.container_nome = VolumiPerContainer.container_nome
+AND VolumiInLetturaPerContainer.container_nome_servizio = VolumiPerContainer.container_nome_servizio
+WHERE VolumiInLetturaPerContainer.num_volumi_lettura = VolumiPerContainer.num_volumi;
+```
+
+### Query 5  
+
+Trovare il nodo o i nodi che se cadessero danneggerebbero più servizi, inoltre viene associato l'admin responsabile del nodo.  
+```sql
+SELECT Containers.hostname_nodo, COUNT(DISTINCT nome_servizio) AS num_servizi, Admins.username AS admin_username
+FROM Containers
+JOIN Nodi ON Nodi.hostname = Containers.hostname_nodo
+JOIN Admins ON Admins.username = Nodi.username_admin
+GROUP BY Containers.hostname_nodo, Admins.username
+HAVING COUNT(DISTINCT nome_servizio) >= ALL(
+    SELECT COUNT(DISTINCT nome_servizio)
+    FROM Containers
+    GROUP BY Containers.hostname_nodo
+)
+ORDER BY num_servizi ASC, Admins.username;
+```
+
+## Creazione degli indici  
+
+```sql
+CREATE INDEX idx_username_developer ON Servizi(username_developer);
+```  
+
+## Applicazione software  
+
+Il file `query.c` contiene il codice C necessario per la connessione e l'esecuzione delle query sul database PostgreSQL, utilizzando la libreria `libpq` per la connessione al database.  
+Le query una volta eseguite vengongo stampate nella console e scritte in un file csv.
+
+## Comando per la creazione del PDF  
+
+pandoc bozza.md -o output.pdf --pdf-engine=xelatex -V geometry:margin=1in --toc --toc-depth 3 --number-sections

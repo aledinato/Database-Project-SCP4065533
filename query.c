@@ -19,53 +19,52 @@ typedef struct{
 
 Query queries[] = {
     {
-        .query_name = "VersionamentoDeployment",
-        .query_string = "WITH RECURSIVE VersioniDeployments AS ("
-                        "SELECT d1.id, d1.esito, d1.ambiente, d1.num_servizi, d1.developer_id, d1.versione_precedente FROM Deployments d1 WHERE id = $1::varchar "
-                        "UNION ALL "
-                        "SELECT d2.id, d2.esito, d2.ambiente, d2.num_servizi, d2.developer_id, d2.versione_precedente FROM Deployments d2 JOIN VersioniDeployments ON VersioniDeployments.versione_precedente = d2.id) "
-                        "SELECT * FROM VersioniDeployments",
+        .query_name = "DeploymentsAmbientiDiversiPerDeveloper",
+        .query_string = "SELECT s.username_developer, s.nome AS nome_servizio, COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti "
+                        "FROM ServiziDeployed sd "
+                        "JOIN Servizi s ON sd.nome_servizio = s.nome "
+                        "GROUP BY s.username_developer, s.nome "
+                        "HAVING COUNT(DISTINCT sd.ambiente_deployment) >= $1::integer",
         .num_params = 1,
-        .input_format = {"%s"}
+        .input_format = {"%d"}
 
     },
     {
         .query_name = "DeploymentsPerDeveloper",
-        .query_string = "SELECT developer_id, COUNT(*) AS num_deployments, "
+        .query_string = "SELECT username_developer, COUNT(*) AS num_deployments, "
                         "ROUND(AVG(num_servizi), 2) AS media_servizi_deployed "
                         "FROM Deployments WHERE esito = $1::varchar "
-                        "GROUP BY developer_id HAVING AVG(num_servizi) > $2::integer "
+                        "GROUP BY username_developer HAVING AVG(num_servizi) > $2::integer "
                         "ORDER BY COUNT(*) DESC, AVG(num_servizi) DESC",
         .num_params = 2,
         .input_format = {"%s", "%d"}
     },
     {
         .query_name = "ContainersSolaLettura",
-        .query_string = "SELECT VolumiPerContainer.container_nome, VolumiPerContainer.container_servizio_id, "
+        .query_string = "SELECT VolumiPerContainer.container_nome, VolumiPerContainer.container_nome_servizio, "
                         "VolumiInLetturaPerContainer.num_volumi_lettura "
                         "FROM VolumiPerContainer JOIN VolumiInLetturaPerContainer "
                         "ON VolumiInLetturaPerContainer.container_nome = VolumiPerContainer.container_nome "
-                        "AND VolumiInLetturaPerContainer.container_servizio_id = VolumiPerContainer.container_servizio_id "
+                        "AND VolumiInLetturaPerContainer.container_nome_servizio = VolumiPerContainer.container_nome_servizio "
                         "WHERE VolumiInLetturaPerContainer.num_volumi_lettura = VolumiPerContainer.num_volumi",
         .num_params = 0,
         .input_format = {""}
     },
     {
         .query_name = "NodiCritici",
-        .query_string = "SELECT Containers.nodo_id, COUNT(DISTINCT servizio_id) AS num_servizi, Admins.username AS admin_username "
-                        "FROM Containers JOIN Nodi ON Nodi.hostname = Containers.nodo_id "
-                        "JOIN Admins ON Admins.username = Nodi.admin_id "
-                        "GROUP BY Containers.nodo_id, Admins.username "
-                        "HAVING COUNT(DISTINCT servizio_id) >= ALL(SELECT COUNT(DISTINCT servizio_id) FROM Containers GROUP BY Containers.nodo_id) "
-                        "ORDER BY num_servizi ASC, Admins.username",
+        .query_string = "SELECT Containers.hostname_nodo, COUNT(DISTINCT nome_servizio) AS num_servizi, Admins.username AS admin_username "
+                        "FROM Containers JOIN Nodi ON Nodi.hostname = Containers.hostname_nodo "
+                        "JOIN Admins ON Admins.username = Nodi.username_admin "
+                        "GROUP BY Containers.hostname_nodo, Admins.username "
+                        "HAVING COUNT(DISTINCT nome_servizio) >= ALL(SELECT COUNT(DISTINCT nome_servizio) FROM Containers GROUP BY Containers.hostname_nodo) ",
         .num_params = 0,
         .input_format = {""}
     },
     {
         .query_name = "ContainersPerSpazioEVolumeMinimo",
-        .query_string = "SELECT container_nome, container_servizio_id, SUM(dimensione) AS spazio_volumi_totale, "
+        .query_string = "SELECT container_nome, container_nome_servizio, SUM(dimensione) AS spazio_volumi_totale, "
                         "MIN(dimensione) AS spazio_volume_minimo "
-                        "FROM Montaggi GROUP BY container_nome, container_servizio_id "
+                        "FROM Montaggi GROUP BY container_nome, container_nome_servizio "
                         "ORDER BY spazio_volumi_totale ASC, spazio_volume_minimo ASC",
         .num_params = 0,
         .input_format = {""}
@@ -177,7 +176,7 @@ int main() {
     while(1){
         printf("Inserire un numero tra 1 e 5 per eseguire la query, 0 per terminare il programma\n\n");
         
-        printf("1) Inserire un id valido di un deployment per ottenere tutte le versioni precedenti del deployment specificato\n");//posibilitù aggiunta data per ordinarle
+        printf("1) Inserire un intero per ottenere i developers che hanno eseguito un numero di deployments, in ambienti diversi, maggiore o uguale dell'intero specificato\n");//posibilitù aggiunta data per ordinarle
         printf("2) Inserire uno stato valido di un deployment e un intero per ottenere i developer con associati i numeri di deployment nello stato specificato e la media dei servizi deployed\n");
         printf("   Vengono considerati solo i developer con una media di servizi deployed superiore all'intero specificato\n");
         printf("3) Si ottengono i Containers che sono in sola lettura su tutti i volumi\n");
