@@ -236,32 +236,68 @@ USING HASH;
 
 INSERT INTO Developers (username, password) VALUES
 ('giulia_dev', 'bcrypt_hash_pw1'),
-('marco_dev', 'bcrypt_hash_pw2');
+('marco_dev', 'bcrypt_hash_pw2'),
+('alessandro_dev', 'bcrypt_hash_pw3'),
+('filippo_dev', 'bcypt_hash_pw4');
 
 INSERT INTO Admins (username, password) VALUES
-('luca_admin', 'bcrypt_hash_pw3'),
-('elena_admin', 'bcrypt_hash_pw4');
+('luca_admin', 'bcrypt_hash_pw5'),
+('elena_admin', 'bcrypt_hash_pw6'),
+('matteo_admin', 'bcrypt_hash_pw7'),
+('davide_admin', 'bcrypt_hash_pw8');
 
 INSERT INTO Servizi (nome, immagine, num_repliche, username_developer) VALUES
 ('servizio-autenticazione', 'autenticazione:v1.0', 3, 'giulia_dev'),
-('servizio-fatturazione', 'fatturazione:v2.1', 1, 'marco_dev');
+('servizio-fatturazione', 'fatturazione:v2.1', 2, 'marco_dev'),
+('servizio-cors', 'cors:v4.2', 3, 'marco_dev'),
+('servizio-proxy', 'proxy:v8.8', 0, 'giulia_dev'),
+('servizio-cert-http', 'certbot:v3.0.9', 0, 'marco_dev'),
+('servizio-scheduling', 'cron:v4.5', 0, 'marco_dev');
 
 INSERT INTO Nodi (hostname, indirizzo_IP, stato, sistema_operativo, username_admin) VALUES
-('nodo-1', '192.168.0.10', 'attivo', 'Ubuntu 22.04', 'luca_admin'),
-('nodo-2', '192.168.0.11', 'attivo', 'Debian 12', 'elena_admin');
+('nodo-1', '192.168.0.10', 'Active', 'Ubuntu 22.04', 'luca_admin'),
+('nodo-2', '192.168.0.11', 'Active', 'Debian 12', 'elena_admin'),
+('nodo-3', '192.168.0.12', 'Paused', 'Kali Linux 2024.1', 'matteo_admin'),
+('nodo-4', '192.168.0.14', 'Active', 'Arch Linux 6.14.4', 'matteo_admin'),
+('nodo-5', '192.168.0.15', 'Active', 'Linux Mint 22.4', 'davide_admin'),
+('nodo-251', '192.168.0.251', 'Drain', 'Windows Server 2012', 'luca_admin'),
+('nodo-252', '192.168.0.252', 'Drain', 'Windows Server 2012', 'luca_admin');
 
 INSERT INTO Containers (nome, stato, hostname_nodo, nome_servizio) VALUES
-('contenitore-auth-1', 'in esecuzione', 'nodo-1', 'servizio-autenticazione'),
-('contenitore-auth-2', 'in esecuzione', 'nodo-1', 'servizio-autenticazione'),
-('contenitore-auth-3', 'in esecuzione', 'nodo-2', 'servizio-autenticazione'),
-('contenitore-fatt-1', 'in esecuzione', 'nodo-2', 'servizio-fatturazione');
+('contenitore-auth-1', 'running', 'nodo-1', 'servizio-autenticazione'),
+('contenitore-auth-2', 'running', 'nodo-1', 'servizio-autenticazione'),
+('contenitore-auth-3', 'running', 'nodo-2', 'servizio-autenticazione'),
+('contenitore-fatt-1', 'running', 'nodo-2', 'servizio-fatturazione'),
+('contenitore-fatt-2', 'created', 'nodo-2', 'servizio-fatturazione'),
+('contenitore-cors-1', 'running', 'nodo-3', 'servizio-cors'),
+('contenitore-cors-2', 'running', 'nodo-1', 'servizio-cors'),
+('contenitore-cors-3', 'running', 'nodo-4', 'servizio-cors'),
+('contenitore-proxy', 'running', 'nodo-2', 'servizio-proxy'),
+('contenitore-reserve-proxy', 'paused', 'nodo-3', 'servizio-proxy'),
+('contenitore-certbot-1', 'running', 'nodo-5', 'servizio-cert-http'),
+('contenitore-certbot-2', 'dead', 'nodo-251', 'servizio-cert-http'),
+('contenitore-scheduler-1', 'running', 'nodo-1', 'servizio-scheduling'),
+('contenitore-scheduler-2', 'running', 'nodo-2', 'servizio-scheduling'),
+('contenitore-scheduler-3', 'running', 'nodo-3', 'servizio-scheduling'),
+('contenitore-scheduler-4', 'running', 'nodo-4', 'servizio-scheduling'),
+('contenitore-scheduler-5', 'running', 'nodo-5', 'servizio-scheduling'),
+('contenitore-scheduler-windows', 'dead', 'nodo-252', 'servizio-scheduling');
 
 INSERT INTO Deployments (nome, esito, ambiente, num_servizi, username_developer, nome_versione_precedente, ambiente_versione_precedente) VALUES
-('deploy-001', 'successo', 'produzione', 1, 'giulia_dev', NULL, NULL),
-('deploy-002', NULL, 'test', 2, 'marco_dev', 'deploy-001', 'produzione');
+('deploy-001', 'successo', 'sviluppo', 1, 'giulia_dev', NULL, NULL),
+('deploy-001', 'fallito', 'test', 2, 'filippo_dev', 'deploy-001', 'sviluppo'),
+('deploy-002', 'successo', 'test', 2, 'filippo_dev', 'deploy-001', 'test'),
+('deploy-master-v1', 'successo', 'produzione', 0, 'alessandro_dev', 'deploy-002', 'test'),
+('deploy-002', 'successo', 'sviluppo', 0, 'alessandro_dev', 'deploy-master-v1', 'produzione'),
+('deploy-003', 'successo', 'sviluppo', 0, 'giulia_dev', 'deploy-002', 'sviluppo'),
+('deploy-003', 'successo', 'test', 0, 'giulia_dev', 'deploy-003', 'sviluppo'),
+('deploy-004', 'successo', 'test', 0, 'filippo_dev', 'deploy-003', 'test'),
+('deploy-master-v2', 'successo', 'produzione', 0, 'marco_dev', 'deploy-004', 'test'),
+('deploy-004', 'fallito', 'sviluppo', 0, 'alessandro_dev', 'deploy-master-v2', 'produzione'),
+('deploy-005', NULL, 'sviluppo', 0, 'alessandro-dev', 'deploy-004', 'sviluppo');
 
 INSERT INTO ServiziDeployed (nome_servizio, nome_deployment, ambiente_deployment) VALUES
-('servizio-autenticazione', 'deploy-001', 'produzione'),
+('servizio-autenticazione', 'deploy-001', 'sviluppo'),
 ('servizio-autenticazione', 'deploy-002', 'test'),
 ('servizio-fatturazione', 'deploy-002', 'test');
 
@@ -287,3 +323,5 @@ INSERT INTO AllocazioniDistribuite (hostname_nodo, nome_volume) VALUES
 
 INSERT INTO MontaggiDistribuiti (path_montaggio, permessi, container_nome, container_nome_servizio, nome_volume) VALUES
 ('/distribuiti/fatt', 'rw', 'contenitore-fatt-1', 'servizio-fatturazione', 'vol-dist-001');
+
+-- Servizi, Nodi e container
