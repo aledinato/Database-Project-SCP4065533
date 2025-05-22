@@ -1,3 +1,5 @@
+---- TABELLE ----
+
 DROP TABLE IF EXISTS MontaggiDistribuiti CASCADE;
 DROP TABLE IF EXISTS MontaggiGlobali CASCADE;
 DROP TABLE IF EXISTS MontaggiLocali CASCADE;
@@ -141,6 +143,8 @@ CREATE TABLE AllocazioniDistribuite(
     FOREIGN KEY(hostname_nodo) REFERENCES Nodi(hostname) ON DELETE CASCADE
 );
 
+---- FUNZIONI E TRIGGER ---- 
+
 CREATE FUNCTION controllo_allocazione_stesso_nodo_locale()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -196,6 +200,39 @@ CREATE TRIGGER controllo_allocazione_volume_distribuito
 BEFORE INSERT ON MontaggiDistribuiti
 FOR EACH ROW
 EXECUTE FUNCTION controllo_allocazione_stesso_nodo_distribuito();
+
+---- INDICI ----
+
+DROP INDEX IF EXISTS DimensioneVolumiLocali;
+DROP INDEX IF EXISTS DimensioneVolumiGlobali;
+DROP INDEX IF EXISTS DimensioneVolumiDistribuiti;
+DROP INDEX IF EXISTS PermessiMontaggiLocali;
+DROP INDEX IF EXISTS PermessiMontaggiGlobali;
+DROP INDEX IF EXISTS PermessiMontaggiDistribuiti;
+
+CREATE INDEX DimensioneVolumiLocali
+ON VolumiLocali ( dimensione );
+
+CREATE INDEX DimensioneVolumiGlobali
+ON VolumiGlobali ( dimensione );
+
+CREATE INDEX DimensioneVolumiDistribuiti
+ON VolumiDistribuiti ( dimensione );
+
+CREATE INDEX PermessiMontaggiLocali
+ON MontaggiLocali ( permessi )
+USING HASH;
+
+CREATE INDEX PermessiMontaggiGlobali
+ON MontaggiGlobali ( permessi )
+USING HASH;
+
+CREATE INDEX PermessiMontaggiDistribuiti
+ON MontaggiDistribuiti ( permessi )
+USING HASH;
+
+
+---- INSERT ----
 
 INSERT INTO Developers (username, password) VALUES
 ('giulia_dev', 'bcrypt_hash_pw1'),
