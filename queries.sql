@@ -1,9 +1,9 @@
 -- query significativa 
--- 1) Developers che hanno fatto almeno 2 deployment in ambienti diversi per lo stesso servizio
-SELECT s.username_developer, s.nome AS nome_servizio, COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti
+-- 1) Trovare i developer che hanno sviluppato dei servizi, poi associati ad un deployment, in almeno un numero di ambienti specifico (es. 2)
+SELECT s.username_developer AS nome_servizio, COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti
 FROM ServiziDeployed sd
 JOIN Servizi s ON sd.nome_servizio = s.nome
-GROUP BY s.username_developer, s.nome
+GROUP BY s.username_developer
 HAVING COUNT(DISTINCT sd.ambiente_deployment) >= 2;
 
 
@@ -54,13 +54,13 @@ WHERE VolumiInLetturaPerContainer.num_volumi_lettura = VolumiPerContainer.num_vo
 SELECT Containers.hostname_nodo, COUNT(DISTINCT nome_servizio) AS num_servizi, Admins.username AS admin_username
 FROM Containers
 JOIN Nodi ON Nodi.hostname = Containers.hostname_nodo
-JOIN Admins ON Admins.username = Nodi.username_admin
-GROUP BY Containers.hostname_nodo, Admins.username
+GROUP BY Containers.hostname_nodo, Nodi.username_admin
 HAVING COUNT(DISTINCT nome_servizio) >= ALL(
     SELECT COUNT(DISTINCT nome_servizio)
     FROM Containers
     GROUP BY Containers.hostname_nodo
 )
+ORDER BY num_servizi ASC, Nodi.username_admin ASC;
 
 
 -- 5) query con group by e having

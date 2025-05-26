@@ -19,11 +19,11 @@ typedef struct{
 
 Query queries[] = {
     {
-        .query_name = "DeploymentsAmbientiDiversiPerDeveloper",
-        .query_string = "SELECT s.username_developer, s.nome AS nome_servizio, COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti "
+        .query_name = "ServiziDeployedAmbientiDiversiPerDeveloper",
+        .query_string = "SELECT s.username_developer AS nome_servizio, COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti "
                         "FROM ServiziDeployed sd "
                         "JOIN Servizi s ON sd.nome_servizio = s.nome "
-                        "GROUP BY s.username_developer, s.nome "
+                        "GROUP BY s.username_developer "
                         "HAVING COUNT(DISTINCT sd.ambiente_deployment) >= $1::integer",
         .num_params = 1,
         .input_format = {"%d"}
@@ -40,6 +40,15 @@ Query queries[] = {
         .input_format = {"%s", "%d"}
     },
     {
+        .query_name = "ContainersPerSpazioEVolumeMinimo",
+        .query_string = "SELECT container_nome, container_nome_servizio, SUM(dimensione) AS spazio_volumi_totale, "
+                        "MIN(dimensione) AS spazio_volume_minimo "
+                        "FROM Montaggi GROUP BY container_nome, container_nome_servizio "
+                        "ORDER BY spazio_volumi_totale ASC, spazio_volume_minimo ASC",
+        .num_params = 0,
+        .input_format = {""}
+    },
+    {
         .query_name = "ContainersSolaLettura",
         .query_string = "SELECT VolumiPerContainer.container_nome, VolumiPerContainer.container_nome_servizio, "
                         "VolumiInLetturaPerContainer.num_volumi_lettura "
@@ -52,20 +61,12 @@ Query queries[] = {
     },
     {
         .query_name = "NodiCritici",
-        .query_string = "SELECT Containers.hostname_nodo, COUNT(DISTINCT nome_servizio) AS num_servizi, Admins.username AS admin_username "
-                        "FROM Containers JOIN Nodi ON Nodi.hostname = Containers.hostname_nodo "
-                        "JOIN Admins ON Admins.username = Nodi.username_admin "
-                        "GROUP BY Containers.hostname_nodo, Admins.username "
-                        "HAVING COUNT(DISTINCT nome_servizio) >= ALL(SELECT COUNT(DISTINCT nome_servizio) FROM Containers GROUP BY Containers.hostname_nodo) ",
-        .num_params = 0,
-        .input_format = {""}
-    },
-    {
-        .query_name = "ContainersPerSpazioEVolumeMinimo",
-        .query_string = "SELECT container_nome, container_nome_servizio, SUM(dimensione) AS spazio_volumi_totale, "
-                        "MIN(dimensione) AS spazio_volume_minimo "
-                        "FROM Montaggi GROUP BY container_nome, container_nome_servizio "
-                        "ORDER BY spazio_volumi_totale ASC, spazio_volume_minimo ASC",
+        .query_string = "SELECT Containers.hostname_nodo, COUNT(DISTINCT nome_servizio) AS num_servizi, Nodi.username_admin AS admin_username "
+                        "FROM Containers "
+                        "JOIN Nodi ON Nodi.hostname = Containers.hostname_nodo "
+                        "GROUP BY Containers.hostname_nodo, Nodi.username_admin "
+                        "HAVING COUNT(DISTINCT nome_servizio) >= ALL(SELECT COUNT(DISTINCT nome_servizio) FROM Containers GROUP BY Containers.hostname_nodo) "
+                        "ORDER BY num_servizi ASC, Nodi.username_admin ASC",
         .num_params = 0,
         .input_format = {""}
     }
@@ -176,13 +177,13 @@ int main() {
     while(1){
         printf("Inserire un numero tra 1 e 5 per eseguire la query, 0 per terminare il programma\n\n");
         
-        printf("1) Inserire un intero per ottenere i developers che hanno eseguito un numero di deployments, in ambienti diversi, maggiore o uguale dell'intero specificato\n");//posibilitù aggiunta data per ordinarle
+        printf("0) Per terminare il programma\n");
+        printf("1) Inserire un intero per ottenere i developer che hanno sviluppato dei servizi, poi deployati, in un numero di ambienti maggiore o uguale dell'intero specificato\n");//posibilitù aggiunta data per ordinarle
         printf("2) Inserire uno stato valido di un deployment e un intero per ottenere i developer con associati i numeri di deployment nello stato specificato e la media dei servizi deployed\n");
         printf("   Vengono considerati solo i developer con una media di servizi deployed superiore all'intero specificato\n");
-        printf("3) Si ottengono i Containers che sono in sola lettura su tutti i volumi\n");
-        printf("4) Si ottengono il nodo o i nodi che se cadessero darebbero problemi a più servizi, viene inserito anche l'admin associato al nodo\n");
-        printf("5) Si ottengono i containers ordinati per spazio totale dei volumi montati in ordine crescente e la dimensione del volume più piccolo di quel container\n");
-        printf("0) Per terminare il programma\n");
+        printf("3) Si ottengono i container ordinati per spazio totale dei volumi montati in ordine crescente e la dimensione del volume più piccolo di quel container\n");
+        printf("4) Si ottengono i container che sono in sola lettura su tutti i volumi\n");
+        printf("5) Si ottengono il nodo o i nodi che se cadessero danneggerebbero più servizi, viene inserito anche l'admin associato al nodo\n");
 
         scanf("%d", &query);
         if(query < 0 || query > 5){
@@ -198,9 +199,15 @@ int main() {
 
         check_results(res, conn);
 
-        print_query_result(res);
-
-        write_query_result(res, conn, query);
+        int output_type;
+        printf("Per stampare a schermo scrivere 0, per stampare su file scrivere 1, 2 per entrambi: ");
+        scanf("%d", &output_type);
+        if(output_type == 1 || output_type == 2){
+            write_query_result(res, conn, query);
+        }
+        if(output_type == 0 || output_type == 2){
+            print_query_result(res);
+        }
 
         PQclear(res);
     }
