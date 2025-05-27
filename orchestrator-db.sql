@@ -203,35 +203,17 @@ EXECUTE FUNCTION controllo_allocazione_stesso_nodo_distribuito();
 
 ---- INDICI ----
 
-DROP INDEX IF EXISTS DimensioneVolumiLocali;
-DROP INDEX IF EXISTS DimensioneVolumiGlobali;
-DROP INDEX IF EXISTS DimensioneVolumiDistribuiti;
-DROP INDEX IF EXISTS PermessiMontaggiLocali;
-DROP INDEX IF EXISTS PermessiMontaggiGlobali;
-DROP INDEX IF EXISTS PermessiMontaggiDistribuiti;
+DROP INDEX IF EXISTS AnzianitaDevelopers;
+DROP INDEX IF EXISTS EsitoDeployments;
 
----- Ottimizzazione query 5 ----
-CREATE INDEX DimensioneVolumiLocali
-ON VolumiLocali ( dimensione );
+---- Ottimizzazione query 2 ----
+CREATE INDEX AnzianitaDevelopers
+ON Developers
+USING HASH ( anzianita );
 
-CREATE INDEX DimensioneVolumiGlobali
-ON VolumiGlobali ( dimensione );
-
-CREATE INDEX DimensioneVolumiDistribuiti
-ON VolumiDistribuiti ( dimensione );
-
----- Ottimizzazione query 3 ----
-CREATE INDEX PermessiMontaggiLocali
-ON MontaggiLocali
-USING HASH ( permessi );
-
-CREATE INDEX PermessiMontaggiGlobali
-ON MontaggiGlobali
-USING HASH ( permessi );
-
-CREATE INDEX PermessiMontaggiDistribuiti
-ON MontaggiDistribuiti
-USING HASH ( permessi );
+CREATE INDEX EsitoDeployments
+ON Deployments
+USING HASH ( esito );
 
 
 ---- INSERT ----

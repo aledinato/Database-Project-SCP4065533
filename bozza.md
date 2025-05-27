@@ -448,40 +448,27 @@ ORDER BY num_servizi ASC, Nodi.username_admin ASC;
 
 ## Creazione degli indici  
 Si vogliono ottimizzare le query create in precedenza attraverso l'utilizzo di indici.
-Si scelgono la query 4, più specificatamente la view *VolumiInLetturaPerContainer* e la query 5:  
+Si scelgono la **query 2** e la **query 5**:  
 
-- Query 4  
-Gli indici inseriti sono di tipo `HASH` così da far accedere le ricerche su `permessi` in tempo `O(1)`.  
-Ciò permette di ottimizzare la ricerca dei volumi montati(di qualsiasi tipo) in sola lettura, in quanto c'è un `WHERE` sulla colonna `permessi` che filtra i risultati.   
+- Query 2  
+Gli indici inseriti sono di tipo `HASH` così da far accedere le ricerche su `Developers.anzianita` e `Deployments.esito` in tempo `O(1)`.  
+Ciò permette di ottimizzare la ricerca dei developers e dei deployments filtrati per anzianità e esito, in quanto c'è un `WHERE` sulla colonna `anzianita` e `esito` che filtra i risultati.   
 ```sql
-CREATE INDEX PermessiMontaggiLocali
-ON MontaggiLocali
-USING HASH ( permessi );
+CREATE INDEX AnzianitaDevelopers
+ON Developers
+USING HASH ( anzianita );
 
-CREATE INDEX PermessiMontaggiGlobali
-ON MontaggiGlobali
-USING HASH ( permessi );
-
-CREATE INDEX PermessiMontaggiDistribuiti
-ON MontaggiDistribuiti
-USING HASH ( permessi );
+CREATE INDEX EsitoDeployments
+ON Deployments
+USING HASH ( esito );
 ```
 
 - Query 5  
-Si era ipotizzato di creare un indice *B-tree* sul campo `dimensione` per ottimizzare la query 3, più specificatamente la funzione di aggregazione `MIN(dimensione)`, tuttavia la documentazione di PostreSQL non garantisce l'ottimizzazione con le funzioni di aggregazione, ma solo con il costrutto `ORDER BY ... LIMIT 1`.  
-La query 3 cerca la dimensione minima del volume per ogni container, quindi non è possibile utilizzare questo costrutto.  
+Si era ipotizzato di creare un indice *B-tree* sul campo `dimensione` per ottimizzare la query 3, più specificatamente la funzione di aggregazione `MIN(dimensione)`, così da velocizzarla essendo il minimo il nodo più a sinistra del balanced tree.  
+Tuttavia la documentazione di PostreSQL non garantisce l'ottimizzazione con le funzioni di aggregazione, ma solo con il costrutto `ORDER BY ... LIMIT 1`.  
+La query 3 cerca la dimensione minima del volume per ogni container, quindi non è possibile utilizzare questo costrutto.
 Fonte: [Documentazione PostgreSQL](https://www.postgresql.org/docs/8.0/functions-aggregate.html)  
 La documentazione è di una versione non più supportata, ma provando empiricamente e guardando la documentazione di versioni più recenti(che non specifica più il caso), si evince che il comportamento non è cambiato.  
-```sql
-CREATE INDEX DimensioneVolumiLocali
-ON VolumiLocali ( dimensione );
-
-CREATE INDEX DimensioneVolumiGlobali
-ON VolumiGlobali ( dimensione );
-
-CREATE INDEX DimensioneVolumiDistribuiti
-ON VolumiDistribuiti ( dimensione );
-```
 
 ## Applicazione software  
 
