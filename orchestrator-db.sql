@@ -18,6 +18,7 @@ DROP TABLE IF EXISTS Developers CASCADE;
 CREATE TABLE Developers(
     username VARCHAR(64),
     password CHAR(60) NOT NULL, -- lunghezza hash bcrypt
+    anzianita VARCHAR(64),
     PRIMARY KEY(username)
 );
 
@@ -235,11 +236,11 @@ USING HASH ( permessi );
 
 ---- INSERT ----
 
-INSERT INTO Developers (username, password) VALUES
-('giulia_dev', 'bcrypt_hash_pw1'),
-('marco_dev', 'bcrypt_hash_pw2'),
-('alessandro_dev', 'bcrypt_hash_pw3'),
-('filippo_dev', 'bcypt_hash_pw4');
+INSERT INTO Developers (username, anzianita,password) VALUES
+('giulia_dev', 'senior', 'bcrypt_hash_pw1'),
+('marco_dev', 'senior', 'bcrypt_hash_pw2'),
+('alessandro_dev', 'junior', 'bcrypt_hash_pw3'),
+('filippo_dev', 'senior', 'bcypt_hash_pw4');
 
 INSERT INTO Admins (username, password) VALUES
 ('luca_admin', 'bcrypt_hash_pw5'),
@@ -374,3 +375,76 @@ INSERT INTO MontaggiDistribuiti (path_montaggio, permessi, container_nome, conta
 ('/distribuiti/nginx', 'rw-', 'container-nginx', 'servizio-nginx', 'vol-dist-004'),
 ('/distribuiti/database', 'rw-', 'container-mongodb', 'servizio-storage', 'vol-dist-005'),
 ('/distribuiti/nextjs', 'rw-', 'container-mongodb-3', 'servizio-storage', 'vol-dist-006');
+
+-- QUERY
+-- 1)
+SELECT s.username_developer AS nome_servizio, 
+COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti
+FROM ServiziDeployed sd
+JOIN Servizi s ON sd.nome_servizio = s.nome
+GROUP BY s.username_developer
+HAVING COUNT(DISTINCT sd.ambiente_deployment) >= 2;
+
+-- 2)
+SELECT dep.username_developer, COUNT(*) AS num_failed_deployments, 
+ROUND(AVG(num_servizi), 2) AS media_servizi_deployed
+FROM Deployments dep
+JOIN Developers dev  
+ON dep.username_developer = dev.username
+WHERE dev.anzianita = 'senior' AND dep.esito = 'failed'
+GROUP BY dep.username_developer
+HAVING AVG(dep.num_servizi) > 2
+ORDER BY COUNT(*) DESC, AVG(dep.num_servizi) DESC;
+
+-- 3)
+CREATE VIEW Montaggi AS
+SELECT MontaggiLocali.*, VolumiLocali.dimensione
+FROM MontaggiLocali
+JOIN VolumiLocali ON VolumiLocali.nome = MontaggiLocali.nome_volume
+UNION ALL
+SELECT MontaggiGlobali.*, VolumiGlobali.dimensione
+FROM MontaggiGlobali
+JOIN VolumiGlobali ON VolumiGlobali.nome = MontaggiGlobali.nome_volume
+UNION ALL
+SELECT MontaggiDistribuiti.*, VolumiDistribuiti.dimensione
+FROM MontaggiDistribuiti
+JOIN VolumiDistribuiti ON VolumiDistribuiti.nome = MontaggiDistribuiti.nome_volume;
+
+SELECT container_nome, container_nome_servizio, 
+SUM(dimensione) AS spazio_volumi_totale, 
+MIN(dimensione) AS spazio_volume_minimo
+FROM Montaggi
+GROUP BY container_nome, container_nome_servizio
+ORDER BY spazio_volumi_totale ASC, spazio_volume_minimo ASC;
+
+-- 4)
+CREATE VIEW VolumiInLetturaPerContainer AS
+SELECT container_nome, container_nome_servizio, COUNT(*) AS num_volumi_lettura
+FROM Montaggi
+WHERE permessi = 'r--'
+GROUP BY container_nome, container_nome_servizio;
+
+CREATE VIEW VolumiPerContainer AS
+SELECT container_nome, container_nome_servizio, COUNT(*) AS num_volumi
+FROM Montaggi
+GROUP BY container_nome, container_nome_servizio;
+
+SELECT vpc.container_nome, vpc.container_nome_servizio, vlpc.num_volumi_lettura
+FROM VolumiPerContainer vpc
+JOIN VolumiInLetturaPerContainer vlpc
+ON vlpc.container_nome = vpc.container_nome
+AND vlpc.container_nome_servizio = vpc.container_nome_servizio
+WHERE vlpc.num_volumi_lettura = vpc.num_volumi;
+
+-- 5)
+SELECT Containers.hostname_nodo, 
+COUNT(DISTINCT nome_servizio) AS num_servizi, Nodi.username_admin
+FROM Containers
+JOIN Nodi ON Nodi.hostname = Containers.hostname_nodo
+GROUP BY Containers.hostname_nodo, Nodi.username_admin
+HAVING COUNT(DISTINCT nome_servizio) >= ALL(
+    SELECT COUNT(DISTINCT nome_servizio)
+    FROM Containers
+    GROUP BY Containers.hostname_nodo
+)
+ORDER BY num_servizi ASC, Nodi.username_admin ASC;

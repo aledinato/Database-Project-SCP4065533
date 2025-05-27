@@ -42,7 +42,8 @@ Gli utenti possono essere di due tipi: **admin** e **developer**
 
 - **Utenti admin**: hanno il compito di creare e gestire nodi, quindi la parte infrastrutturale dell'orchestrator.
   
-- **Utenti developer**: hanno il compito di creare e gestire servizi e deployment, quindi la parte applicativa dell'orchestrator.
+- **Utenti developer**: hanno il compito di creare e gestire servizi e deployment, quindi la parte applicativa dell'orchestrator, inoltre contiene un attributo in più rispetto ad admin.
+  - *anzianità*: stringa che rappresenta l'anzianità del developer, come per esempio "junior", "senior" o "lead".
   
 - **Nodi**: sono le macchine fisiche o virtuali che eseguono i container Docker.  
 Contengono le seguenti informazioni:
@@ -58,6 +59,7 @@ Contengono le seguenti informazioni:
     - *stato*: stato del container che può essere Running, Paused, Created, Dead  
 
 I container possono montare più volumi che però sono allocati su un nodo, il container monta solo volumi che sono presenti nel nodo in cui il container è ospitato, almeno che il volume non sia di tipo globale, in quel caso il volume è allocato su un server esterno.  
+Container di diversi servizi possono avere lo stesso nome perchè sono identificati dal nome e dal servizio padre.
 Inoltre i container possono accedere a path limitati e con permessi differenti, come per esempio lettura, scrittura ed esecuzione.  
 
 - **Volumi**: sono le entità che permettono di salvare dati persistenti dei container Docker.  
@@ -91,7 +93,7 @@ Inoltre è possibile creare uno storico dei deployment, quindi quando si crea un
 ![Progettazione concettuale](./assets/ER.jpg)  
 
 Come da analisi dei requisiti, l'utente è l'entità che amministra l'orchestrato, ha un proprio username e password, e può essere di due tipi: **admin** e **developer**.  
-Perciò c'è la necessità di creare una generalizzazione dell'entità *Utente* in *Admin* e *Developer*, in modo da poter gestire i diversi privilegi e relazioni.  
+Perciò c'è la necessità di creare una generalizzazione dell'entità *Utente* in *Admin* e *Developer*, in modo da poter gestire i diversi privilegi, relazioni e attributi.
 I developer possono creare **deployment** e **servizi**, questo porta all'associazione 1 a N, invece l'admin può creare solo **nodi**, portando anch'essa ad una associazione 1 a N.  
 Sia developer che admin non sono obbligati a creare deployment, servizi o nodi, però essi sono obbligati ad avere associato un admin o un developer in base al contesto.  
 
@@ -143,7 +145,7 @@ Questa sezione descrive la progettazione logica dato lo schema concettuale svilu
 | Entità | Descrizione | Attributi | Identificatore |
 |-----------|-----------|-----------|-----------|
 | Utente | Utente che gestisce l'orchestrator | *Username, Password* | *Username* |
-| Developer | Utente che gestisce i servizi e i deployment | |  |
+| Developer | Utente che gestisce i servizi e i deployment | Anzianità |  |
 | Admin | Utente che gestisce i nodi | |  |
 | Nodo | Macchina fisica o virtuale che esegue i container Docker | *Hostname, Indirizzo IP, OS, Stato* | *Hostname* |
 | Container | Entità che esegue i microservizi | *Nome, Stato* | *Nome, NomeServizio* |
@@ -294,7 +296,7 @@ Si potrebbe pensare all'eliminazione della relazione *AllocazioneLocale*, ma è 
 Le generalizzazioni descritte nello schema concettuale vengono ristrutturate con l'obiettivo di eliminare le ridondanze e semplificare il modello relazionale.  
 Le due entità coinvolte sono:  
 
-- **Utente**: la generalizzazione di Utente in *Developer* e *Admin* è necessaria per la distinzione dei privilegi per tipo di utente, in quanto i due tipi di utente hanno relazioni totalmente diverse tra di loro, ma condividono gli stessi attributi.  
+- **Utente**: la generalizzazione di Utente in *Developer* e *Admin* è necessaria per la distinzione dei privilegi per tipo di utente, in quanto i due tipi di utente hanno relazioni totalmente diverse tra di loro e developer ha un attributo in più rispetto ad admin.  
 Perciò si decide di partizionare l'entità *Utente* nelle specializzazioni *Developer* e *Admin* con lo scopo di mantenere i vincoli relativi ai loro ruoli, ovvero che un developer non può creare nodi e un admin non può creare servizi e deployment.  
 Questa scelta aumenta il numero di tabelle, ma oltre a mantenere i vincoli precedentemente descritti, riduce al minimo i valori nulli e non richiede l'aggiunta dell'attributo *Ruolo*.  
 
@@ -307,7 +309,7 @@ Nel caso si fosse deciso di accorpare le tre specializzazioni in un'unica entit�
 
 ## Schema relazionale  
 
-- **Developers**(<u>username</u>, password)
+- **Developers**(<u>username</u>, password, anzianità)
 - **Admins**(<u>username</u>, password)
 - **Servizi**(<u>nome</u>, immagine, num_repliche, username_developer)
   - Servizi.username_developer $→$ Developers.username
@@ -361,16 +363,18 @@ HAVING COUNT(DISTINCT sd.ambiente_deployment) >= 2;
 
 ### Query 2  
 
-Trovare i developer con almeno un deployment in uno stato specifico (es. failed) e con media di servizi deployed maggiore di una determinata soglia (es. 2).  
+Trovare i developer con un grado di anzianità specifico, almeno un deployment in uno stato specifico (es. failed) e con media di servizi deployed maggiore di una determinata soglia (es. 2).  
 Inoltre ordinarli per numero di deployment in quel determinato stato e per media di servizi deployed, entrambi in ordine decrescente.  
 ```sql
-SELECT username_developer, COUNT(*) AS num_failed_deployments, 
+SELECT dep.username_developer, COUNT(*) AS num_failed_deployments, 
 ROUND(AVG(num_servizi), 2) AS media_servizi_deployed
-FROM Deployments
-WHERE esito = 'failed'
-GROUP BY username_developer
-HAVING AVG(num_servizi) > 2
-ORDER BY COUNT(*) DESC, AVG(num_servizi) DESC;
+FROM Deployments dep
+JOIN Developers dev  
+ON dep.username_developer = dev.username
+WHERE dev.anzianita = 'senior' AND dep.esito = 'failed'
+GROUP BY dep.username_developer
+HAVING AVG(dep.num_servizi) > 2
+ORDER BY COUNT(*) DESC, AVG(dep.num_servizi) DESC;
 ```
 ![Risultato seconda query](./assets/query2.png){ width=50% }
 
@@ -443,8 +447,12 @@ ORDER BY num_servizi ASC, Nodi.username_admin ASC;
 ![Risultato quinta query](./assets/query5.png){ width=50% }
 
 ## Creazione degli indici  
-Si vuole ottimizzare le query create in precedenza attraverso l'utilizzo di indici.
-Si sceglie la query 3, più specificatamente la view *VolumiInLetturaPerContainer*:
+Si vogliono ottimizzare le query create in precedenza attraverso l'utilizzo di indici.
+Si scelgono la query 4, più specificatamente la view *VolumiInLetturaPerContainer* e la query 5:  
+
+- Query 4  
+Gli indici inseriti sono di tipo `HASH` così da far accedere le ricerche su `permessi` in tempo `O(1)`.  
+Ciò permette di ottimizzare la ricerca dei volumi montati(di qualsiasi tipo) in sola lettura, in quanto c'è un `WHERE` sulla colonna `permessi` che filtra i risultati.   
 ```sql
 CREATE INDEX PermessiMontaggiLocali
 ON MontaggiLocali
@@ -458,9 +466,10 @@ CREATE INDEX PermessiMontaggiDistribuiti
 ON MontaggiDistribuiti
 USING HASH ( permessi );
 ```
-Gli indici inseriti sono di tipo `HASH` così da far accedere le ricerche su `permessi` in tempo `O(1)`.  
-Ciò permette di ottimizzare la ricerca dei volumi montati(di qualsiasi tipo) in sola lettura, in quanto c'è un `WHERE` sulla colonna `permessi` che filtra i risultati.  
-Si era ipotizzato di creare un indice *B-tree* sul campo `dimensione` per ottimizzare la query 3, più specificatamente la funzione di aggregazione `MIN(dimensione)`, tuttavia la documentazione di PostreSQL non garantisce l'ottimizzazione con le funzioni di aggregazione, ma solo con il costrutto `ORDER BY ... LIMIT 1`, ma la query 3 cerca la dimensione minima del volume per ogni container, quindi non è possibile utilizzare questo costrutto.  
+
+- Query 5  
+Si era ipotizzato di creare un indice *B-tree* sul campo `dimensione` per ottimizzare la query 3, più specificatamente la funzione di aggregazione `MIN(dimensione)`, tuttavia la documentazione di PostreSQL non garantisce l'ottimizzazione con le funzioni di aggregazione, ma solo con il costrutto `ORDER BY ... LIMIT 1`.  
+La query 3 cerca la dimensione minima del volume per ogni container, quindi non è possibile utilizzare questo costrutto.  
 Fonte: [Documentazione PostgreSQL](https://www.postgresql.org/docs/8.0/functions-aggregate.html)  
 La documentazione è di una versione non più supportata, ma provando empiricamente e guardando la documentazione di versioni più recenti(che non specifica più il caso), si evince che il comportamento non è cambiato.  
 ```sql
@@ -483,7 +492,7 @@ Una volta eseguito il programma vengono stampate le descrizioni delle query con 
 
   0. Per terminare il programma  
   1. Developer che hanno sviluppato dei servizi, poi deployati, in un numero di ambienti maggiore o uguale dell'intero specificato 
-  2. Developer con associati i numeri di deployment nello stato specificato e la media dei servizi deployed, vengono considerati solo i developer con una media di servizi deployed superiore all'intero specificato  
+  2. Developer con specifica anzianità con associati i numeri di deployment nello stato specificato e la media dei servizi deployed, vengono considerati solo i developer con una media di servizi deployed superiore all'intero specificato  
   3. Container che sono in sola lettura su tutti i volumi  
   4. Il nodo o i nodi che se cadessero darebbero problemi a più servizi, viene inserito anche l'admin associato al nodo  
   5. Container ordinati per spazio totale dei volumi montati in ordine crescente e la dimensione del volume più piccolo di quel container  

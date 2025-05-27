@@ -6,9 +6,9 @@
 #define PG_HOST "127.0.0.1"
 #define PG_USER "admin"
 #define PG_PASS "admin"
-#define PG_DB "mydb"
+#define PG_DB "testProgettoDB"
 #define PG_PORT 5432
-#define MAX_PARAMS 2
+#define MAX_PARAMS 3
 
 typedef struct{
     char* query_name;
@@ -31,13 +31,16 @@ Query queries[] = {
     },
     {
         .query_name = "DeploymentsPerDeveloper",
-        .query_string = "SELECT username_developer, COUNT(*) AS num_deployments, "
+        .query_string = "SELECT dep.username_developer, COUNT(*) AS num_failed_deployments, "
                         "ROUND(AVG(num_servizi), 2) AS media_servizi_deployed "
-                        "FROM Deployments WHERE esito = $1::varchar "
-                        "GROUP BY username_developer HAVING AVG(num_servizi) > $2::integer "
-                        "ORDER BY COUNT(*) DESC, AVG(num_servizi) DESC",
-        .num_params = 2,
-        .input_format = {"%s", "%d"}
+                        "FROM Deployments dep "
+                        "JOIN Developers dev ON dep.username_developer = dev.username "
+                        "WHERE dev.anzianita = $1::varchar AND dep.esito = $2::varchar "
+                        "GROUP BY dep.username_developer "
+                        "HAVING AVG(dep.num_servizi) > $3::integer "
+                        "ORDER BY COUNT(*) DESC, AVG(dep.num_servizi) DESC",
+        .num_params = 3,
+        .input_format = {"%s", "%s","%d"}
     },
     {
         .query_name = "ContainersPerSpazioEVolumeMinimo",
@@ -179,7 +182,7 @@ int main() {
         
         printf("0) Per terminare il programma\n");
         printf("1) Inserire un intero per ottenere i developer che hanno sviluppato dei servizi, poi deployati, in un numero di ambienti maggiore o uguale dell'intero specificato\n");//posibilitù aggiunta data per ordinarle
-        printf("2) Inserire uno stato valido di un deployment e un intero per ottenere i developer con associati i numeri di deployment nello stato specificato e la media dei servizi deployed\n");
+        printf("2) Inserire un grado di anzianità, uno stato valido di un deployment e un intero per ottenere i developer nel grado specificato con associati i numeri di deployment nello stato specificato e la media dei servizi deployed\n");
         printf("   Vengono considerati solo i developer con una media di servizi deployed superiore all'intero specificato\n");
         printf("3) Si ottengono i container ordinati per spazio totale dei volumi montati in ordine crescente e la dimensione del volume più piccolo di quel container\n");
         printf("4) Si ottengono i container che sono in sola lettura su tutti i volumi\n");
