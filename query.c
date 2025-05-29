@@ -206,13 +206,14 @@ int main() {
         int output_type;
         printf("Per stampare a schermo scrivere 0, per stampare su file scrivere 1, 2 per entrambi: ");
         scanf("%d", &output_type);
+        printf("\n\n\n");
         if(output_type == 1 || output_type == 2){
             write_query_result(res, conn, query);
         }
         if(output_type == 0 || output_type == 2){
             print_query_result(res);
         }
-
+        printf("\n\n\n");
         PQclear(res);
     }
     PQfinish(conn);
