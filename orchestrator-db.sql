@@ -144,69 +144,17 @@ CREATE TABLE AllocazioniDistribuite(
     FOREIGN KEY(hostname_nodo) REFERENCES Nodi(hostname) ON DELETE CASCADE
 );
 
----- FUNZIONI E TRIGGER ---- 
-CREATE FUNCTION controllo_allocazione_stesso_nodo_locale()
-RETURNS TRIGGER AS $$
-DECLARE
-    volume_hostname_nodo VARCHAR(64);
-    container_hostname_nodo VARCHAR(64);
-BEGIN
-    SELECT hostname_nodo INTO container_hostname_nodo
-    FROM Containers
-    WHERE nome = NEW.container_nome AND nome_servizio = NEW.container_nome_servizio;
-
-    SELECT hostname_nodo INTO volume_hostname_nodo
-    FROM VolumiLocali
-    WHERE VolumiLocali.nome = NEW.nome_volume;
-
-    IF container_hostname_nodo IS NULL OR volume_hostname_nodo IS NULL OR container_hostname_nodo != volume_hostname_nodo THEN
-        RAISE EXCEPTION 'Volume locale e container devono essere allocati sullo stesso nodo.';
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-
-
-CREATE TRIGGER controllo_allocazione_volume_locale
-BEFORE INSERT ON MontaggiLocali
-FOR EACH ROW
-EXECUTE FUNCTION controllo_allocazione_stesso_nodo_locale();
-
-CREATE FUNCTION controllo_allocazione_stesso_nodo_distribuito()
-RETURNS TRIGGER AS $$
-DECLARE
-    container_hostname_nodo VARCHAR(64);
-BEGIN
-    SELECT hostname_nodo INTO container_hostname_nodo
-    FROM Containers
-    WHERE nome = NEW.container_nome AND nome_servizio = NEW.container_nome_servizio;
-
-    IF NOT EXISTS (
-        SELECT *
-        FROM AllocazioniDistribuite
-        WHERE AllocazioniDistribuite.hostname_nodo = container_hostname_nodo AND nome_volume = NEW.nome_volume
-    ) THEN
-        RAISE EXCEPTION 'Volume distribuito e container devono essere allocati sullo stesso nodo.';
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-
-CREATE TRIGGER controllo_allocazione_volume_distribuito
-BEFORE INSERT ON MontaggiDistribuiti
-FOR EACH ROW
-EXECUTE FUNCTION controllo_allocazione_stesso_nodo_distribuito();
-
 ---- INDICI ----
 
 DROP INDEX IF EXISTS AnzianitaDevelopers;
 DROP INDEX IF EXISTS EsitoDeployments;
+DROP INDEX IF EXISTS NumReplicheServizi;
 
----- Ottimizzazione query 2 ----
+---- Ottimizzazione query 1 ----
+CREATE INDEX NumReplicheServizi
+ON Servizi ( num_repliche );
+
+---- Ottimizzazioni query 2 ----
 CREATE INDEX AnzianitaDevelopers
 ON Developers
 USING HASH ( anzianita );
@@ -242,8 +190,8 @@ INSERT INTO Servizi (nome, immagine, num_repliche, username_developer) VALUES
 ('servizio-nginx', 'nginx:latest', 2, 'alessandro_dev'),
 ('servizio-storage', 's3:latest', 2, 'alessandro_dev'),
 ('servizio-database', 'mongodb:latest', 3, 'alessandro_dev'),
-('servizio-notification', 'notification:2.1', 1, 'filippo_dev'),
-('servizio-nextjs', 'nextjs:latest', 1, 'filippo_dev');
+('servizio-notification', 'notification:2.1', 2, 'filippo_dev'),
+('servizio-nextjs', 'nextjs:latest', 2, 'filippo_dev');
 
 INSERT INTO Nodi (hostname, indirizzo_IP, stato, sistema_operativo, username_admin) VALUES
 ('nodo-1', '192.168.0.10', 'Ready', 'Ubuntu 22.04', 'luca_admin'),
@@ -364,6 +312,7 @@ SELECT s.username_developer AS nome_servizio,
 COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti
 FROM ServiziDeployed sd
 JOIN Servizi s ON sd.nome_servizio = s.nome
+WHERE s.num_repliche >= 2
 GROUP BY s.username_developer
 HAVING COUNT(DISTINCT sd.ambiente_deployment) >= 2;
 

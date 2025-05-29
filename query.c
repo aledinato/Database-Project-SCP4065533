@@ -23,10 +23,11 @@ Query queries[] = {
         .query_string = "SELECT s.username_developer AS nome_servizio, COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti "
                         "FROM ServiziDeployed sd "
                         "JOIN Servizi s ON sd.nome_servizio = s.nome "
+                        "WHERE s.num_repliche >=  $1::integer "
                         "GROUP BY s.username_developer "
-                        "HAVING COUNT(DISTINCT sd.ambiente_deployment) >= $1::integer",
-        .num_params = 1,
-        .input_format = {"%d"}
+                        "HAVING COUNT(DISTINCT sd.ambiente_deployment) >= $2::integer",
+        .num_params = 2,
+        .input_format = {"%d", "%d"}
 
     },
     {
@@ -181,7 +182,7 @@ int main() {
         printf("Inserire un numero tra 1 e 5 per eseguire la query, 0 per terminare il programma\n\n");
         
         printf("0) Per terminare il programma\n");
-        printf("1) Inserire un intero per ottenere i developer che hanno sviluppato dei servizi, poi deployati, in un numero di ambienti maggiore o uguale dell'intero specificato\n");//posibilitù aggiunta data per ordinarle
+        printf("1) Inserire due interi per ottenere i developer che hanno sviluppato dei servizi, poi deployati, con almeno il numero di repliche specificate nel primo intero inserito, in un numero di ambienti maggiore o uguale al secondo intero specificato\n");//posibilitù aggiunta data per ordinarle
         printf("2) Inserire un grado di anzianità, uno stato valido di un deployment e un intero per ottenere i developer nel grado specificato con associati i numeri di deployment nello stato specificato e la media dei servizi deployed\n");
         printf("   Vengono considerati solo i developer con una media di servizi deployed superiore all'intero specificato\n");
         printf("3) Si ottengono i container ordinati per spazio totale dei volumi montati in ordine crescente e la dimensione del volume più piccolo di quel container\n");

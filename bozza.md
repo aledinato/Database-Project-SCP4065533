@@ -5,6 +5,8 @@ title: |
     Progetto Basi di Dati: Sistema di Gestione Orchestrator
   \end{center}
 author: "Alessandro Dinato, Filippo Rampazzo"
+fontsize: 10pt
+mainfont: "Arial"
 toc: true
 toc-title: "Indice"
 toc-before: true
@@ -350,12 +352,13 @@ Infine contiene il codice SQL delle query e degli indici che saranno spiegati in
 
 ### Query 1  
 
-Trovare i developer che hanno sviluppato dei servizi, poi associati ad un deployment, in almeno un numero di ambienti specifico (es. 2).
+Trovare i developer che hanno sviluppato dei servizi con almeno un determinato numero di repliche (es. 1), poi associati ad un deployment, in almeno un numero di ambienti specifico (es. 2).
 ```sql
 SELECT s.username_developer AS nome_servizio, 
 COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti
 FROM ServiziDeployed sd
 JOIN Servizi s ON sd.nome_servizio = s.nome
+WHERE s.num_repliche >= 2
 GROUP BY s.username_developer
 HAVING COUNT(DISTINCT sd.ambiente_deployment) >= 2;
 ```
@@ -448,11 +451,19 @@ ORDER BY num_servizi ASC, Nodi.username_admin ASC;
 
 ## Creazione degli indici  
 Si vogliono ottimizzare le query create in precedenza attraverso l'utilizzo di indici.
-Si scelgono la **query 2** e la **query 5**:  
+Si scelgono la **query 1** e la **query 2**:  
+
+- Query 1  
+L'indice inserito è di tipo `B-TREE` così da far accedere le ricerche su `Servizi.num_repliche` in tempo `O(log n)`.  
+La query ne beneficia in quanto nel `WHERE` viene utilizzato l'operatore di confronto `>=` sulla colonna `num_repliche`, così che grazie all'indice si può scegliere quale ramo selezionare al posto di dover scorrere l'intera tabella.
+```sql
+CREATE INDEX NumReplicheServizi
+ON Servizi ( num_repliche );
+```
 
 - Query 2  
 Gli indici inseriti sono di tipo `HASH` così da far accedere le ricerche su `Developers.anzianita` e `Deployments.esito` in tempo `O(1)`.  
-Ciò permette di ottimizzare la ricerca dei developers e dei deployments filtrati per anzianità e esito, in quanto c'è un `WHERE` sulla colonna `anzianita` e `esito` che filtra i risultati.   
+Ciò permette di ottimizzare la ricerca dei developers e dei deployments filtrati per anzianità e esito, in quanto c'è un `WHERE` sulla colonna `anzianita` e `esito` con operatore di confronto `=`.
 ```sql
 CREATE INDEX AnzianitaDevelopers
 ON Developers
@@ -463,13 +474,6 @@ ON Deployments
 USING HASH ( esito );
 ```
 
-- Query 5  
-Si era ipotizzato di creare un indice *B-tree* sul campo `dimensione` per ottimizzare la query 3, più specificatamente la funzione di aggregazione `MIN(dimensione)`, così da velocizzarla essendo il minimo il nodo più a sinistra del balanced tree.  
-Tuttavia la documentazione di PostreSQL non garantisce l'ottimizzazione con le funzioni di aggregazione, ma solo con il costrutto `ORDER BY ... LIMIT 1`.  
-La query 3 cerca la dimensione minima del volume per ogni container, quindi non è possibile utilizzare questo costrutto.
-Fonte: [Documentazione PostgreSQL](https://www.postgresql.org/docs/8.0/functions-aggregate.html)  
-La documentazione è di una versione non più supportata, ma provando empiricamente e guardando la documentazione di versioni più recenti(che non specifica più il caso), si evince che il comportamento non è cambiato.  
-
 ## Applicazione software  
 
 Il file `query.c` contiene il codice C necessario per la connessione e l'esecuzione delle query sul database PostgreSQL, utilizzando la libreria `libpq` per la connessione al database.  
@@ -478,10 +482,10 @@ Le query una volta eseguite vengongo stampate nella console e scritte in un file
 Una volta eseguito il programma vengono stampate le descrizioni delle query con i numeri corrispondenti:  
 
   0. Per terminare il programma  
-  1. Developer che hanno sviluppato dei servizi, poi deployati, in un numero di ambienti maggiore o uguale dell'intero specificato 
+  1. Developer che hanno sviluppato dei servizi, poi deployati, con almeno un numero specifico di repliche, in un numero di ambienti maggiore o uguale dell'intero specificato 
   2. Developer con specifica anzianità con associati i numeri di deployment nello stato specificato e la media dei servizi deployed, vengono considerati solo i developer con una media di servizi deployed superiore all'intero specificato  
   3. Container che sono in sola lettura su tutti i volumi  
   4. Il nodo o i nodi che se cadessero darebbero problemi a più servizi, viene inserito anche l'admin associato al nodo  
   5. Container ordinati per spazio totale dei volumi montati in ordine crescente e la dimensione del volume più piccolo di quel container  
 
-Le query 1. e 2. sono parametrizzate con un intero per la prima, una stringa e un intero per la seconda query, in modo da poterle eseguire con parametri diversi senza dover modificare il codice.
+Le query 1. e 2. sono parametrizzate con due interi per la prima, una stringa e un intero per la seconda query, in modo da poterle eseguire con parametri diversi senza dover modificare il codice.
