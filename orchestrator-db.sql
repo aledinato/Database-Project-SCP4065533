@@ -18,7 +18,7 @@ DROP TABLE IF EXISTS Developers CASCADE;
 CREATE TABLE Developers(
     username VARCHAR(64),
     password CHAR(60) NOT NULL, -- lunghezza hash bcrypt
-    anzianita VARCHAR(64),
+    anzianita VARCHAR(64) NOT NULL,
     PRIMARY KEY(username)
 );
 
@@ -34,7 +34,7 @@ CREATE TABLE Servizi(
     num_repliche SMALLINT NOT NULL CHECK (num_repliche >= 1), -- massimo circa 32.767 repliche per servizio
     username_developer VARCHAR(64) NOT NULL,
     PRIMARY KEY(nome),
-    FOREIGN KEY(username_developer) REFERENCES Developers(username) ON DELETE RESTRICT
+    FOREIGN KEY(username_developer) REFERENCES Developers(username) ON DELETE RESTRICT -- prima di eliminare un developer bisogna fare pulizia dei servizi(manualmente) per evitare danni involontari
 );
 
 CREATE TABLE Deployments(
@@ -76,7 +76,7 @@ CREATE TABLE Containers(
     nome_servizio VARCHAR(64) NOT NULL,
     PRIMARY KEY(nome, nome_servizio),
     FOREIGN KEY(nome_servizio) REFERENCES Servizi(nome) ON DELETE CASCADE,
-    FOREIGN KEY(hostname_nodo) REFERENCES Nodi(hostname) ON DELETE CASCADE
+    FOREIGN KEY(hostname_nodo) REFERENCES Nodi(hostname) ON DELETE RESTRICT
 );
 
 CREATE TABLE VolumiLocali(
@@ -105,7 +105,7 @@ CREATE TABLE VolumiDistribuiti(
 
 CREATE TABLE MontaggiLocali(
     path_montaggio VARCHAR(255) NOT NULL,
-    permessi VARCHAR(10) NOT NULL,
+    permessi CHAR(3) NOT NULL, -- esempio r-- unix-like
     container_nome VARCHAR(64),
     container_nome_servizio VARCHAR(64),
     nome_volume VARCHAR(64),
@@ -116,7 +116,7 @@ CREATE TABLE MontaggiLocali(
 
 CREATE TABLE MontaggiGlobali(
     path_montaggio VARCHAR(255) NOT NULL,
-    permessi VARCHAR(10) NOT NULL,
+    permessi CHAR(3) NOT NULL,
     container_nome VARCHAR(64),
     container_nome_servizio VARCHAR(64),
     nome_volume VARCHAR(64),
@@ -127,7 +127,7 @@ CREATE TABLE MontaggiGlobali(
 
 CREATE TABLE MontaggiDistribuiti(
     path_montaggio VARCHAR(255) NOT NULL,
-    permessi VARCHAR(10) NOT NULL,
+    permessi CHAR(3) NOT NULL,
     container_nome VARCHAR(64),
     container_nome_servizio VARCHAR(64),
     nome_volume VARCHAR(64),
@@ -184,8 +184,7 @@ INSERT INTO Servizi (nome, immagine, num_repliche, username_developer) VALUES
 ('servizio-cors', 'cors:v4.2', 3, 'marco_dev'),
 ('servizio-proxy', 'proxy:v8.8', 2, 'giulia_dev'),
 ('servizio-cert-http', 'certbot:v3.0.9', 2, 'marco_dev'),
-('servizio-scheduling', 'scheduler:v4.5', 2, 'marco_dev'),
-
+('servizio-scheduling', 'scheduler:v4.5', 6, 'marco_dev'),
 ('servizio-cache', 'redis:latest', 2, 'alessandro_dev'),
 ('servizio-nginx', 'nginx:latest', 2, 'alessandro_dev'),
 ('servizio-storage', 's3:latest', 2, 'alessandro_dev'),
@@ -227,11 +226,13 @@ INSERT INTO Containers (nome, stato, hostname_nodo, nome_servizio) VALUES
 ('container-nginx-2', 'stopped', 'nodo-3', 'servizio-nginx'),
 ('container-storage', 'running', 'nodo-4', 'servizio-storage'),
 ('container-storage-2', 'running', 'nodo-5', 'servizio-storage'),
-('container-mongodb', 'running', 'nodo-1','servizio-storage'),
-('container-mongodb-2', 'running', 'nodo-2','servizio-storage'),
-('container-mongodb-3', 'running', 'nodo-3','servizio-storage'),
+('container-mongodb', 'running', 'nodo-1','servizio-database'),
+('container-mongodb-2', 'running', 'nodo-2','servizio-database'),
+('container-mongodb-3', 'running', 'nodo-3','servizio-database'),
 ('container-notification', 'stopped', 'nodo-5','servizio-notification'),
-('container-nextjs', 'running', 'nodo-3','servizio-nextjs');
+('container-notification-2', 'stopped', 'nodo-5','servizio-notification'),
+('container-nextjs', 'running', 'nodo-3','servizio-nextjs'),
+('container-nextjs-2', 'running', 'nodo-4','servizio-nextjs');
 
 INSERT INTO Deployments (nome, esito, ambiente, num_servizi, username_developer, nome_versione_precedente, ambiente_versione_precedente) VALUES
 ('deploy-001', 'success', 'sviluppo', 1, 'giulia_dev', NULL, NULL),
@@ -303,12 +304,12 @@ INSERT INTO MontaggiDistribuiti (path_montaggio, permessi, container_nome, conta
 ('/distribuiti/fatt', 'r--', 'container-fatt-1', 'servizio-fatturazione', 'vol-dist-001'),
 ('/distribuiti/cache', 'rw-', 'container-cache', 'servizio-cache', 'vol-dist-003'),
 ('/distribuiti/nginx', 'rw-', 'container-nginx', 'servizio-nginx', 'vol-dist-004'),
-('/distribuiti/database', 'rw-', 'container-mongodb', 'servizio-storage', 'vol-dist-005'),
-('/distribuiti/nextjs', 'rw-', 'container-mongodb-3', 'servizio-storage', 'vol-dist-006');
+('/distribuiti/database', 'rw-', 'container-mongodb', 'servizio-database', 'vol-dist-005'),
+('/distribuiti/nextjs', 'rw-', 'container-mongodb-3', 'servizio-database', 'vol-dist-006');
 
 -- QUERY
 -- 1)
-SELECT s.username_developer AS nome_servizio, 
+SELECT s.username_developer AS username_developer, 
 COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti
 FROM ServiziDeployed sd
 JOIN Servizi s ON sd.nome_servizio = s.nome
@@ -360,7 +361,7 @@ SELECT container_nome, container_nome_servizio, COUNT(*) AS num_volumi
 FROM Montaggi
 GROUP BY container_nome, container_nome_servizio;
 
-SELECT vpc.container_nome, vpc.container_nome_servizio, vlpc.num_volumi_lettura
+SELECT vpc.container_nome, vpc.container_nome_servizio, vlpc.num_volumi_lettura, vpc.num_volumi
 FROM VolumiPerContainer vpc
 JOIN VolumiInLetturaPerContainer vlpc
 ON vlpc.container_nome = vpc.container_nome
@@ -378,4 +379,4 @@ HAVING COUNT(DISTINCT nome_servizio) >= ALL(
     FROM Containers
     GROUP BY Containers.hostname_nodo
 )
-ORDER BY num_servizi ASC, Nodi.username_admin ASC;
+ORDER BY Containers.hostname_nodo ASC, Nodi.username_admin ASC;

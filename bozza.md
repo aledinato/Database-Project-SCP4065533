@@ -21,12 +21,12 @@ Questo progetto ha lo scopo di realizzare una base di dati per un orchestrator c
 Un orchestrator è un software che permette di gestire e coordinare più container Docker in un cluster.  
 In un orchestrator ci possono essere **utenti** con diversi privilegi, in questo progetto saranno *admin* e *developer* i ruoli possibili.  
 Il primo gestisce la parte infrastrutturale quali i **nodi**, mentre il secondo coordina la creazione di **servizi** e **deployment**.  
-I **container** sono l'effettiva entità che eseguono i microservizi, essi risiedono in un **nodo** che può essere qualsiasi macchina con installato Docker, come per esempio una macchina virtuale o un'istanza EC2 su AWS.  
+I **container** sono l'effettiva entità che esegue i microservizi, essi risiedono in un **nodo** che può essere qualsiasi macchina con installato Docker, come per esempio una macchina virtuale o un'istanza EC2 su AWS.  
 Inoltre i container hanno bisogno di salvare i dati persistenti all'interno dei **volumi**, che possono essere di tre tipi:  
 
-- Il *volume locale* può essere montato su più container, ma sempre nello stesso nodo.
-- Il *volume globale* è localizzato in un server remoto, come per esempio un NAS
-- Il *volume distribuito* è distribuito su più nodi così da poter essere montato su container con nodi diversi tra di loro, ovviamente necessita di forte sincronizzazione tra i nodi e che l'effettivo container a cui viene montato il volume sia in uno dei nodi in cui è allocata una distribuzione del volume.
+- Il *volume locale* può essere montato su più container, ospitati nello stesso nodo;
+- Il *volume globale* è localizzato in un server remoto, come per esempio un NAS;
+- Il *volume distribuito* è ospitato su più nodi così da poter essere montato su container con nodi diversi tra di loro, ovviamente necessita di forte sincronizzazione tra i nodi e che l'effettivo container a cui viene montato il volume sia ospitato in uno dei nodi in cui è allocata una distribuzione del volume.
 
 Il developer ha il compito di creare **servizi** e **deployment**, dove i servizi sono un insieme di container replicati su più nodi e i deployment sono un insieme di servizi che rappresentano il rilascio di una nuova versione dell'applicativo.  
 L'obiettivo è garantire una gestione efficiente e organizzata delle informazioni così da rendere la gestione dei microservizi e del loro versionamento il più semplice possibile.  
@@ -44,7 +44,8 @@ Gli utenti possono essere di due tipi: **admin** e **developer**
 
 - **Utenti admin**: hanno il compito di creare e gestire nodi, quindi la parte infrastrutturale dell'orchestrator.
   
-- **Utenti developer**: hanno il compito di creare e gestire servizi e deployment, quindi la parte applicativa dell'orchestrator, inoltre contiene un attributo in più rispetto ad admin.
+- **Utenti developer**: hanno il compito di creare e gestire servizi e deployment, quindi la parte applicativa dell'orchestrator.  
+Contiene, inoltre, un attributo in più rispetto ad admin:  
   - *anzianità*: stringa che rappresenta l'anzianità del developer, come per esempio "junior", "senior" o "lead".
   
 - **Nodi**: sono le macchine fisiche o virtuali che eseguono i container Docker.  
@@ -53,15 +54,13 @@ Contengono le seguenti informazioni:
     - *ip*: indirizzo IP del nodo
     - *sistema operativo*: sistema operativo del nodo
     - *stato*: stato del nodo (Ready, Down, Drain)  
-
-    I nodi possono avere allocati diversi tipi di volumi (locale e distribuito) e oltre ad essere gestiti da un admin, possono contenere più container Docker.  
+    I nodi possono avere allocati diversi tipi di volumi (locale e distribuito) e oltre ad essere gestiti da un admin, possono ospitare più container Docker.  
 - **Container**:  sono le entità che eseguono i microservizi e fanno parte di un servizio all'interno di un nodo.  
 Contengono le seguenti informazioni:
     - *nome*: stringa che insieme al servizio padre identifica il container
-    - *stato*: stato del container che può essere Running, Paused, Created, Dead  
-
-I container possono montare più volumi che però sono allocati su un nodo, il container monta solo volumi che sono presenti nel nodo in cui il container è ospitato, almeno che il volume non sia di tipo globale, in quel caso il volume è allocato su un server esterno.  
-Container di diversi servizi possono avere lo stesso nome perchè sono identificati dal nome e dal servizio padre.
+    - *stato*: stato del container che può essere "Running", "Paused", "Created", "Dead"  
+I container possono montare più volumi allocati su un nodo, il container monta solo volumi che sono presenti nel nodo in cui il container è ospitato, a meno che il volume non sia di tipo globale, in quel caso il volume è allocato su un server esterno.  
+All'interno di un servizio padre i nomi dei container devono essere univoci, tuttavia, container di servizi possono avere nomi uguali.  
 Inoltre i container possono accedere a path limitati e con permessi differenti, come per esempio lettura, scrittura ed esecuzione.  
 
 - **Volumi**: sono le entità che permettono di salvare dati persistenti dei container Docker.  
@@ -74,30 +73,30 @@ I volumi possono essere di tre tipi: **locale**, **globale** e **distribuito**.
 - **Volume globale**: è un volume centralizzato che può essere allocato su un server esterno e può essere condiviso da più container di nodi diversi senza la necessità che il nodo padre abbia il volume allocato.  
 Necessita dell'indirizzo IP del server remoto così da poterlo raggiungere.
 - **Volume distribuito**: è un volume che può essere allocato su più nodi e può essere condiviso da più container di nodi diversi che hanno una distribuzione del volume
-- **Servizi**: sono un astrazione che rappresenta un insieme di container replicati su più nodi.  
+- **Servizi**: sono un'astrazione che rappresenta un insieme di container replicati su più nodi.  
 Contengono le seguenti informazioni:
     - *nome*: titolo del servizio che lo identifica
     - *immagine*: immagine Docker da cui verranno creati i container
-    - *numero repliche*: numero che rappresenta il numero di repliche del servizio  
+    - *numero repliche*: numero di repliche del servizio all'interno di container
 I servizi sono creati e gestiti da un developer, il quale può creare più servizi con diverso nome.  
 I servizi hanno più container associati (le "repliche"), potenzialmente anche sullo stesso nodo.  
-- **Deployment**: sono un astrazione che rappresenta un insieme di servizi che vengono rilasciati in una nuova versione dell'applicativo.  
+- **Deployment**: sono un'astrazione che rappresenta un insieme di servizi che vengono rilasciati in una nuova versione dell'applicativo.  
 Contengono le seguenti informazioni:
     - *nome*: nome che dà contesto al deployment
     - *ambiente*: ambiente in cui viene eseguito il deployment (sviluppo, test, produzione)
     - *esito*: esito del deployment (success, running, failed)
     - *numero servizi*: numero di servizi che lo compongono  
-I deployment sono identificati da il nome e l'ambiente in cui vengono eseguiti, così da avere lo stesso nome in ambienti diversi (esempio: ecommerce-dev, ecommerce-prod).
-Il deployment ha associato più servizi e può essere creato solo da un developer.  
+I deployment sono identificati dal nome e dall'ambiente in cui vengono eseguiti, così da avere lo stesso nome in ambienti diversi (esempio: ecommerce-dev, ecommerce-prod).  
+Il deployment ha associato più servizi e il developer che l'ha prodotto.  
 Inoltre è possibile creare uno storico dei deployment, quindi quando si crea un nuovo deployment il precedente viene associato a quello nuovo come "padre".
 
 # Progettazione concettuale
 ![Progettazione concettuale](./assets/ER.jpg)  
 
-Come da analisi dei requisiti, l'utente è l'entità che amministra l'orchestrato, ha un proprio username e password, e può essere di due tipi: **admin** e **developer**.  
-Perciò c'è la necessità di creare una generalizzazione dell'entità *Utente* in *Admin* e *Developer*, in modo da poter gestire i diversi privilegi, relazioni e attributi.
+Come da analisi dei requisiti, l'utente è l'entità che amministra l'orchestrator, ha un proprio username e password, e può essere di due tipi: **admin** e **developer**.  
+Perciò c'è la necessità di creare una generalizzazione dell'entità *Utente* in *Admin* e *Developer*, in modo da poter gestire i diversi privilegi, relazioni e attributi.  
 I developer possono creare **deployment** e **servizi**, questo porta all'associazione 1 a N, invece l'admin può creare solo **nodi**, portando anch'essa ad una associazione 1 a N.  
-Sia developer che admin non sono obbligati a creare deployment, servizi o nodi, però essi sono obbligati ad avere associato un admin o un developer in base al contesto.  
+Nè developer e nè admin sono obbligati a creare deployment, servizi o nodi, i quali, tuttavia, sono obbligati ad avere associato un admin o un developer in base al contesto.  
 
 Per quanto riguarda **servizi** e **deployment**, la traduzione dall'analisi dei requisiti avviene in modo abbastanza diretto.  
 Un **servizio**, identificato da un proprio nome, può essere parte di uno o più deployment, mentre un deployment, che è per definizione un insieme di servizi, deve contenere almeno uno di essi (non è possibile effettuare deployment "vuoti").  
@@ -105,7 +104,7 @@ Di ciascun deployment è anche possibile memorizzare la versione precedente, que
 Inoltre non è necessario che la creazione del deployment che contiene un servizio sia effettuato dallo stesso utente che ha creato il servizio stesso.  
 
 Vi è poi la gestione della struttura infrastrutturale del cluster, che comprende **nodi, container e volumi**, a cui spetta il compito di far funzionare i servizi.  
-Sulla relazione **container-servizi**, è fondamentale che un servizio abbia almeno un container per essere effettivamente eseguito, e che un container sia parte di uno e un solo servizio, non si prevedono container "orfani", ovvero che non fanno parte di nessun servizio.  
+Sulla relazione **container-servizi**, è fondamentale che un servizio abbia almeno un container per essere effettivamente eseguito, e che un container sia parte di uno e un solo servizio (non si prevedono container "orfani", ovvero che non fanno parte di nessun servizio).  
 Ciascun **container** può montare diversi **volumi**, utilizzati come file system, e un **volume** può anche essere condiviso tra più container.  
 Ciascun volume è visto da un container con un percorso di montaggio e ciascun container dispone di più permessi specifici su ognuno dei suoi volumi.  
 I volumi, anche se condivisi da più container, dispongono di un proprio percorso fisico ed è di interesse memorizzarne la dimensione (in KB).  
@@ -113,18 +112,18 @@ Ad esempio, un volume $A$ di qualsiasi tipo, con percorso '<u>/volumes/A</u>', p
 Inoltre ci possono essere diversi tipi di volume: **locale**, **globale** e **distribuito**.  
 Perciò abbiamo bisogno di una generalizzazione dell'entità *Volume* in *VolumeLocale*, *VolumeGlobale* e *VolumeDistribuito*, dato che essi hanno relazioni e attributi diversi tra di loro.  
 Mentre un **volume locale** può essere allocato ad un solo nodo, i **volumi distribuiti** possono essere allocati su più nodi ed essere montati su tutti i container contenenti una sua distribuzione nel nodo in cui il container è ospitato.  
-I **volumi globali**, a differenza degli altri due tipi, non sono allocati a nessun nodo, e sono accessibili da tutti i container con un proprio indirizzo IP, che va quindi memorizzato.  
-Un qualsiasi volume può anche non essere associato a nessun container, ma è comunque allocato in un nodo.  
-Questi vincoli portano ad una associazione N a N tra **container** e **volumi** con i relativi attributi *path montaggio* e *permessi*, mentre **volume locale** e **volume distribuito** hanno rispettivamente una associazione 1 a N e N a N con **nodi**, dato che un volume distribuito come già specificato deve avere una o più distribuzioni su più nodi, mentre un volume locale deve essere allocato in un solo nodo.  
+I **volumi globali**, a differenza degli altri due tipi, non sono allocati in nessun nodo, e sono accessibili da tutti i container con un proprio indirizzo IP, che va quindi memorizzato.  
+Un qualsiasi volume può anche non essere associato a un container, ma deve comunque essere allocato in un nodo.  
+Questi vincoli portano ad un'associazione N a N tra **container** e **volumi** con i relativi attributi *path montaggio* e *permessi*, mentre **volume locale** e **volume distribuito** hanno rispettivamente un'associazione 1 a N e N a N con **nodi**, dato che un volume distribuito come già specificato deve avere una o più distribuzioni su più nodi, mentre un volume locale deve essere allocato in un solo nodo.  
 
 Vi sono infine i **nodi**, che costituiscono l'unità fondamentale del cluster.  
-I **nodi** possono ospitare più **container** e più **volumi**, tuttavia un nodo può anche essere privo di container e volumi, questo giustifica la cardinalità (0,N) tra **nodi** e **container** e tra **nodi** e **volumi**(locali e distribuiti).
+I **nodi** possono ospitare più **container** e più **volumi**, tuttavia un nodo può anche essere privo di container e volumi, questo giustifica la cardinalità (0,N) tra **nodi** e **container** e tra **nodi** e **volumi**(locali e distribuiti).  
 Dall'altra parte, un container è necessariamente ospitato in uno e un solo nodo.  
 Ciascun **nodo** è identificato da un proprio hostname univoco, e può trovarsi in tre stati: "Up", "Down" e "Drain".  
 
-Il diagramma ER non permette di rappresentare i seguente vincoli che si evincono dall'analisi dei requisiti:  
+Il diagramma ER non permette di rappresentare i seguenti vincoli che si evincono dall'analisi dei requisiti:  
 
-- un volume può essere associato a un container e allocato in un nodo solo se il nodo padre del container è lo stesso in cui è allocato il volume.  
+- un volume può essere montato in un container e allocato in un nodo solo se il nodo padre del container è lo stesso in cui è allocato il volume.  
 Sia $V$ l'insieme dei Volumi, $C$ l'insieme dei Container e $N$ l'insieme dei Nodi, allora:
 $$
 \forall v \in V \backslash \{\text{volumi globali}\}, c \in C, n \in N: v \in Montaggi(c), n \in Allocazioni(v) \Rightarrow n \in Ospitazioni(c)
@@ -147,7 +146,7 @@ Questa sezione descrive la progettazione logica dato lo schema concettuale svilu
 | Entità | Descrizione | Attributi | Identificatore |
 |-----------|-----------|-----------|-----------|
 | Utente | Utente che gestisce l'orchestrator | *Username, Password* | *Username* |
-| Developer | Utente che gestisce i servizi e i deployment | Anzianità |  |
+| Developer | Utente che gestisce i servizi e i deployment | *Anzianità* |  |
 | Admin | Utente che gestisce i nodi | |  |
 | Nodo | Macchina fisica o virtuale che esegue i container Docker | *Hostname, Indirizzo IP, OS, Stato* | *Hostname* |
 | Container | Entità che esegue i microservizi | *Nome, Stato* | *Nome, NomeServizio* |
@@ -162,15 +161,15 @@ Questa sezione descrive la progettazione logica dato lo schema concettuale svilu
 
 | Relazione | Descrizione | Componente | Attributi |
 |-----------|-----------|-----------|-----------|
-| Sviluppo | Sviluppo servizio da parte di un developer | Developer, Servizio | |
-| Associazione | Associazione tra più servizi e più deployment | Servizio, Deployment | |
-| Produzione | Produzione deployment da parte di un developer | Developer, Deployment | |
-| Creazione | Creazione nodo da parte di un admin | Admin, Nodo | |
-| Ospitazione | Ospitazione di più container in un nodo | Nodo, Container | |
+| Sviluppo | Sviluppi servizi da parte di un developer | Developer, Servizio | |
+| Associazione | Associazioni tra più servizi e più deployment | Servizio, Deployment | |
+| Produzione | Produzioni deployment da parte di un developer | Developer, Deployment | |
+| Creazione | Creazioni nodi da parte di un admin | Admin, Nodo | |
+| Ospitazione | Ospitazioni di più container in un nodo | Nodo, Container | |
 | Part-of | I container sono parte di un servizio | Servizio, Container | |
-| Montaggio | Associazione tra più container e più volumi | Container, Volume | *PathMontaggio, Permessi* |
-| Allocazione distribuita | Allocazione volume distribuito su più nodi | VolumeDistribuito, Nodo | |
-| Allocazione locale | Allocazione volume locale in un nodo | VolumeLocale, Nodo | |
+| Montaggio | Associazioni tra più container e più volumi | Container, Volume | *PathMontaggio, Permessi* |
+| Allocazione distribuita | Allocazioni volumi distribuiti su più nodi | VolumeDistribuito, Nodo | |
+| Allocazione locale | Allocazioni volumi locali in un nodo | VolumeLocale, Nodo | |
 | Versione precedente | Associazione deployment alla sua versione precedente | Deployment, Deployment | |
 
 ## Ristrutturazione attributi multipli  
@@ -183,7 +182,7 @@ I permessi possibili sono *read*('r'), *write*('w') e *execute*('x'), un volume 
 
 Nello schema concettuale sono presenti due ridondanze da analizzare:  
 
-- **Numero Repliche**, in *Servizio*, rappresenta il numero di container replicati su più nodi, che può essere ottenuti contando i container con lo stesso servizio.  
+- **Numero Repliche**, in *Servizio*, rappresenta il numero di container replicati su più nodi, che può essere ottenuto contando i container con lo stesso servizio.  
 Questo attributo viene modificato ogni volta che si vuole aumentare/diminuire il numero di repliche o quando un container viene creato o eliminato.  
 Lo scopo di un Orchestrator è tutelare i servizi con variazione dei requisiti molto rapida, perciò si ipotizza uno Swarm Docker con 50 servizi attivi e 20 repliche per servizio di media, ovvero 1000 container attivi.  
 Sempre ipotizzando una media di 10 modifiche per ogni servizio al giorno, l'attributo **Numero Repliche** viene modificato in media 500 volte al giorno e viene visualizzato in media 20 volte al giorno per ogni servizio, ovvero 1000 volte al giorno.  
@@ -238,11 +237,11 @@ Sempre ipotizzando una media di 10 modifiche per ogni servizio al giorno, l'attr
   L'analisi suggerisce che l'attributo **Numero Repliche** è necessario, in quanto il costo totale con ridondanza è 4 volte inferiore rispetto al costo totale senza ridondanza e considerando l'alto volume di accessi sia in lettura che in scrittura risulta fondamentale mantenere l'attributo.  
 
 - **Numero Servizi**, in *Deployment*, rappresenta il numero di servizi associati ad un deployment, che può essere ottenuto contando i servizi con lo stesso deployment.  
-Questo attributo tende a non essere modificato dato che si preferisce crearne un nuovo deployment piuttosto di modificarne uno già esistente per favorire il versionamento dei deployment.  
+Questo attributo tende a non essere modificato dato che si preferisce creare un nuovo deployment piuttosto di modificarne uno già esistente per favorire il versionamento dei deployment.  
 Ciò accade perchè c'è una forte necessità di fare rollback in caso il deployment fallisca o abbia dei bug nell'ambiente in cui è stato fatto.  
 Si utilizzano le stesse ipotesi dell'analisi precedente, ovvero 50 servizi attivi e 20 repliche per servizio di media.  
 Inoltre si consideri la creazione, in media, di 3 deployment al giorno (dev, test e produzione) con 50 servizi per deployment, quindi in totale ipotizziamo 1000 deployment come volume.  
-  - **Operazione 1** (3 al giorno): memorizza un nuovo deployment associato a più servizi
+  - **Operazione 1** (3 volte al giorno): memorizza un nuovo deployment associato a più servizi
   - **Operazione 2** (6 volte al giorno): visualizza il numero di servizi di un deployment prima di crearne uno nuovo e dopo averlo creato
 
   Come già precisato, si specificano i volumi della base di dati:  
@@ -287,7 +286,7 @@ Inoltre si consideri la creazione, in media, di 3 deployment al giorno (dev, tes
     Assumendo costo doppio per gli accessi in scrittura:
     $$ \text{CostoTotale}_{SenzaRidondanza} = (3 \cdot 2) + (3 \cdot 2) + (50 \cdot 2) + 6 + (50\cdot6) = 418 $$
 
-  L'analisi suggerisce che l'attributo **Numero servizi** è utile, in quanto il costo totale con ridondanze è circa 3 volte inferiore, tuttavia anche l'ipotesi di rimuoverlo sarebbe valida dato il numero di accessi è in termini assoluti molto basso.  
+  L'analisi suggerisce che l'attributo **Numero servizi** è utile, in quanto il costo totale con ridondanza è circa 3 volte inferiore, tuttavia anche l'ipotesi di rimuoverlo sarebbe valida dato che il numero di accessi è in termini assoluti molto basso.  
   Si sceglie di mantenerlo per semplificare le query ed evitare il calcolo del numero di servizi associati ad un deployment, tuttavia è fondamentale mantenere la consistenza del numero di servizi salvato nel deployment.  
   Inoltre è chiaro che l'analisi di questa ridondanza favorisce il mantenimento dell'attributo, dato che non si considera l'analisi dal punto di vista dell'aggiunta di un servizio con associazione ad un deployment, tuttavia quella determinata operazione non è comune nel contesto descritto.
 
@@ -307,54 +306,54 @@ Perciò si decide di partizionare l'entità *Volume* in *VolumeLocale*, *VolumeG
 Questa scelta aumenta il numero di tabelle, ma rende possibile l'implementazione di attributi e relazioni specifiche per ogni tipo di volume, inoltre riduce al minimo il numero di valori nulli.  
 Nel caso si fosse deciso di accorpare le tre specializzazioni in un'unica entità sarebbe stato molto complesso implementare le relazioni specifiche per ogni tipo di volume, inoltre l'attributo *IndirizzoIPServer* sarebbe stato nullo per i volumi locali e distribuiti, rendendo l'entità meno efficiente.  
 
-![Progettazione concettuale](./assets/ER_Refurbished.jpg)  
+![Progettazione logica](./assets/ER_Refurbished.jpg)  
 
 ## Schema relazionale  
 
-- **Developers**(<u>username</u>, password, anzianità)
-- **Admins**(<u>username</u>, password)
-- **Servizi**(<u>nome</u>, immagine, num_repliche, username_developer)
+- **Developers**(**username**, password, anzianità)
+- **Admins**(**username**, password)
+- **Servizi**(**nome**, immagine, num_repliche, username_developer)
   - Servizi.username_developer $→$ Developers.username
-- **Deployments**(<u>nome, ambiente</u>, esito, num_servizi, username_developer, versione_precedente)
+- **Deployments**(**nome, ambiente**, esito, num_servizi, username_developer, nome_versione_precedente, ambiente_versione_precedente)
   - Deployments.username_developer $→$ Developers.username
-  - Deployments.versione_precedente $→$ Deployments.nome
-- **ServiziDeployed**(<u>nome_servizio, nome_deployment, ambiente_deployment</u>)
+  - Deployments.(nome_versione_precedente, ambiente_versione_precedente) $→$ Deployments.(nome, ambiente)
+- **ServiziDeployed**(**nome_servizio, nome_deployment, ambiente_deployment**)
   - ServiziDeployed.nome_servizio $→$ Servizi.nome
   - ServiziDeployed.(nome_deployment, ambiente_deployment) $→$ Deployments.(nome, ambiente)
-- **Nodi**(<u>hostname</u>, indirizzo_IP, stato, sistema_operativo, username_admin)
+- **Nodi**(**hostname**, indirizzo_IP, stato, sistema_operativo, username_admin)
   - Nodi.username_admin $→$ Admins.username
-- **Containers**(<u>nome, nome_servizio</u>, stato, hostname_nodo)
+- **Containers**(**nome, nome_servizio**, stato, hostname_nodo)
   - Containers.nome_servizio $→$ Servizi.nome
   - Containers.hostname_nodo $→$ Nodi.hostname
-- **VolumiLocali**(<u>nome</u>, dimensione, path_fisico, hostname_nodo)
+- **VolumiLocali**(**nome**, dimensione, path_fisico, hostname_nodo)
   - VolumiLocali.hostname_nodo $→$ Nodi.hostname
-- **VolumiGlobali**(<u>nome</u>, dimensione, path_fisico, indirizzo_IP_server)
-- **VolumiDistribuiti**(<u>nome</u>, dimensione, path_fisico)
-- **MontaggiLocali**(<u>container_nome, container_nome_servizio, nome_volume</u>, path_montaggio, permessi)
+- **VolumiGlobali**(**nome**, dimensione, path_fisico, indirizzo_IP_server)
+- **VolumiDistribuiti**(**nome**, dimensione, path_fisico)
+- **MontaggiLocali**(**container_nome, container_nome_servizio, nome_volume**, path_montaggio, permessi)
   - MontaggiLocali.(container_nome, container_nome_servizio) $→$ Containers.(nome, nome_servizio)
-  - MontaggiLocali.nome_volume $→$ VolumiLocali.nome
-- **MontaggiGlobali**(<u>container_nome, container_nome_servizio, nome_volume</u>, path_montaggio, permessi)
+  - MontaggiLocali.nome_volume $→$ VolumiLocali.nome  
+- **MontaggiGlobali**(**container_nome, container_nome_servizio, nome_volume**, path_montaggio, permessi)
   - MontaggiGlobali.(container_nome, container_nome_servizio) $→$ Containers.(nome, nome_servizio)
   - MontaggiGlobali.nome_volume $→$ VolumiGlobali.nome
-- **MontaggiDistribuiti**(<u>container_nome, container_nome__servizio, nome_volume</u>, path_montaggio, permessi)
+- **MontaggiDistribuiti**(**container_nome, container_nome__servizio, nome_volume**, path_montaggio, permessi)
   - MontaggiDistribuiti.(container_nome, container_nome_servizio) $→$ Containers.(nome, nome_servizio)
   - MontaggiDistribuiti.nome_volume $→$ VolumiDistribuiti.nome
-- **AllocazioniDistribuite**(<u>hostname_nodo, nome_volume</u>)
+- **AllocazioniDistribuite**(**hostname_nodo, nome_volume**)
   - AllocazioniDistribuite.hostname_nodo $→$ Nodi.hostname
   - AllocazioniDistribuite.nome_volume $→$ VolumiDistribuiti.nome
 
 
 # Implementazione in PostgreSQL e definizione delle query
-Il file `orchestrator-db.sql` contiene il codice SQL necessario alla creazione e il popolamento delle tabelle del database, inoltre è presente un trigger che permette di far rispettare il primo vincolo di integrità referenziale, specificato nella progettazione concettuale.  
+Il file `orchestrator-db.sql` contiene il codice SQL necessario alla creazione e il popolamento delle tabelle del database.  
 Infine contiene il codice SQL delle query e degli indici che saranno spiegati in seguito con i relativi risultati.
 
 ## Definizione delle query  
 
 ### Query 1  
 
-Trovare i developer che hanno sviluppato dei servizi con almeno un determinato numero di repliche (es. 1), poi associati ad un deployment, in almeno un numero di ambienti specifico (es. 2).
+Trovare i developer che hanno realizzato servizi con almeno un certo numero di repliche (es. 2) e i servizi sono stati associati a deployment effettuati in almeno un certo numero di ambienti distinti (es. 2).
 ```sql
-SELECT s.username_developer AS nome_servizio, 
+SELECT s.username_developer AS username_developer, 
 COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti
 FROM ServiziDeployed sd
 JOIN Servizi s ON sd.nome_servizio = s.nome
@@ -383,7 +382,7 @@ ORDER BY COUNT(*) DESC, AVG(dep.num_servizi) DESC;
 
 ### Query 3  
 
-Trovare i container ordinati per spazio disponibile in ordine crescente e il volume più piccolo per ogni container sempre in ordine crescente.  
+Trovare i container ordinati per spazio disponibile in ordine crescente e il volume montato più piccolo per ogni container.  
 ```sql
 CREATE VIEW Montaggi AS
 SELECT MontaggiLocali.*, VolumiLocali.dimensione
@@ -422,7 +421,7 @@ SELECT container_nome, container_nome_servizio, COUNT(*) AS num_volumi
 FROM Montaggi
 GROUP BY container_nome, container_nome_servizio;
 
-SELECT vpc.container_nome, vpc.container_nome_servizio, vlpc.num_volumi_lettura
+SELECT vpc.container_nome, vpc.container_nome_servizio, vlpc.num_volumi_lettura, vpc.num_volumi
 FROM VolumiPerContainer vpc
 JOIN VolumiInLetturaPerContainer vlpc
 ON vlpc.container_nome = vpc.container_nome
@@ -445,7 +444,7 @@ HAVING COUNT(DISTINCT nome_servizio) >= ALL(
     FROM Containers
     GROUP BY Containers.hostname_nodo
 )
-ORDER BY num_servizi ASC, Nodi.username_admin ASC;
+ORDER BY Containers.hostname_nodo ASC, Nodi.username_admin ASC;
 ```
 ![Risultato quinta query](./assets/query5.png){ width=50% }
 
@@ -477,12 +476,12 @@ USING HASH ( esito );
 ## Applicazione software  
 
 Il file `query.c` contiene il codice C necessario per la connessione e l'esecuzione delle query sul database PostgreSQL, utilizzando la libreria `libpq` per la connessione al database.  
-Le query vengono preparate attraverso `PQprepare` ed eseguite con `PQexecPrepared` così da migliorare le performance in caso di esecuzione ripetuta delle stesse query, inoltre sono istanziate nella array di struct `Query` che contiene il nome delle query, il testo delle query e i parametri da passare alle query.  
-Le query una volta eseguite vengongo stampate nella console e scritte in un file csv, in base all'input dell'utente dopo aver scelto la query.   
+Le query vengono preparate attraverso `PQprepare` ed eseguite con `PQexecPrepared` così da migliorare le performance in caso di esecuzione ripetuta delle stesse query, inoltre sono istanziate nell'array di struct `Query` che contiene il nome delle query, il testo delle query e i parametri da passare alle query.  
+Le query una volta eseguite vengongo stampate nella console e/o scritte in un file csv, in base all'input dell'utente dopo aver scelto la query.   
 Una volta eseguito il programma vengono stampate le descrizioni delle query con i numeri corrispondenti:  
 
   0. Per terminare il programma  
-  1. Developer che hanno sviluppato dei servizi, poi deployati, con almeno un numero specifico di repliche, in un numero di ambienti maggiore o uguale dell'intero specificato 
+  1. Developer che hanno sviluppato dei servizi, poi deployati, con almeno un numero specifico di repliche, in un numero di ambienti distinti maggiore o uguale all'intero specificato 
   2. Developer con specifica anzianità con associati i numeri di deployment nello stato specificato e la media dei servizi deployed, vengono considerati solo i developer con una media di servizi deployed superiore all'intero specificato  
   3. Container che sono in sola lettura su tutti i volumi  
   4. Il nodo o i nodi che se cadessero darebbero problemi a più servizi, viene inserito anche l'admin associato al nodo  

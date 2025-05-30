@@ -20,7 +20,7 @@ typedef struct{
 Query queries[] = {
     {
         .query_name = "ServiziDeployedAmbientiDiversiPerDeveloper",
-        .query_string = "SELECT s.username_developer AS nome_servizio, COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti "
+        .query_string = "SELECT s.username_developer AS username_developer, COUNT(DISTINCT sd.ambiente_deployment) AS num_ambienti "
                         "FROM ServiziDeployed sd "
                         "JOIN Servizi s ON sd.nome_servizio = s.nome "
                         "WHERE s.num_repliche >=  $1::integer "
@@ -55,7 +55,7 @@ Query queries[] = {
     {
         .query_name = "ContainersSolaLettura",
         .query_string = "SELECT VolumiPerContainer.container_nome, VolumiPerContainer.container_nome_servizio, "
-                        "VolumiInLetturaPerContainer.num_volumi_lettura "
+                        "VolumiInLetturaPerContainer.num_volumi_lettura, VolumiPerContainer.num_volumi "
                         "FROM VolumiPerContainer JOIN VolumiInLetturaPerContainer "
                         "ON VolumiInLetturaPerContainer.container_nome = VolumiPerContainer.container_nome "
                         "AND VolumiInLetturaPerContainer.container_nome_servizio = VolumiPerContainer.container_nome_servizio "
@@ -70,7 +70,7 @@ Query queries[] = {
                         "JOIN Nodi ON Nodi.hostname = Containers.hostname_nodo "
                         "GROUP BY Containers.hostname_nodo, Nodi.username_admin "
                         "HAVING COUNT(DISTINCT nome_servizio) >= ALL(SELECT COUNT(DISTINCT nome_servizio) FROM Containers GROUP BY Containers.hostname_nodo) "
-                        "ORDER BY num_servizi ASC, Nodi.username_admin ASC",
+                        "ORDER BY Containers.hostname_nodo ASC, Nodi.username_admin ASC",
         .num_params = 0,
         .input_format = {""}
     }
@@ -96,7 +96,7 @@ void print_query_result(PGresult *res){
     int num_fields = PQnfields(res);
     
     for(int i=0; i < num_fields; i++){
-        printf("%s\t\t", PQfname(res, i));
+        printf("%s\t", PQfname(res, i));
     }
     printf("\n");
 
@@ -182,7 +182,7 @@ int main() {
         printf("Inserire un numero tra 1 e 5 per eseguire la query, 0 per terminare il programma\n\n");
         
         printf("0) Per terminare il programma\n");
-        printf("1) Inserire due interi per ottenere i developer che hanno sviluppato dei servizi, poi deployati, con almeno il numero di repliche specificate nel primo intero inserito, in un numero di ambienti maggiore o uguale al secondo intero specificato\n");//posibilitù aggiunta data per ordinarle
+        printf("1) Inserire due interi per ottenere i developer che hanno sviluppato dei servizi, poi deployati, con almeno il numero di repliche specificate nel primo intero inserito, in un numero di ambienti diversi maggiore o uguale al secondo intero specificato\n");
         printf("2) Inserire un grado di anzianità, uno stato valido di un deployment e un intero per ottenere i developer nel grado specificato con associati i numeri di deployment nello stato specificato e la media dei servizi deployed\n");
         printf("   Vengono considerati solo i developer con una media di servizi deployed superiore all'intero specificato\n");
         printf("3) Si ottengono i container ordinati per spazio totale dei volumi montati in ordine crescente e la dimensione del volume più piccolo di quel container\n");
